@@ -1,115 +1,53 @@
-<p align="right">
-  <strong>English</strong>
-  <span> | </span>
-  <a href="/docs/README/zh-cn.md">
-  简体中文
-  </a>
-</p>
+# EhReader
 
-<h1 align="center">
-  <img src="https://github.com/EhViewer-NekoInverter/Arts/blob/main/launcher_icon-web.webp" width="150" alt="EhViewer">
-  <br>EhViewer<br>
-</h1>
+EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0.1.0 (100)**。
+开发仓库为 [haorengg12/EhReader](https://github.com/haorengg12/EhReader)，开发分支为 `dev`。
 
-<p align="center">
-  <a href="https://github.com/EhViewer-NekoInverter/EhViewer/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/EhViewer-NekoInverter/EhViewer/ci.yml?style=flat-square" alt="Github Actions">
-  </a>
-  <a href="/LICENSE">
-    <img src="https://img.shields.io/github/license/EhViewer-NekoInverter/EhViewer?style=flat-square" alt="LICENSE">
-  </a>
-  <a href="https://github.com/EhViewer-NekoInverter/Ehviewer/releases">
-    <img src="https://img.shields.io/github/v/release/EhViewer-NekoInverter/Ehviewer?style=flat-square&include_prereleases" alt="Releases">
-  </a>
-  <a href="https://github.com/EhViewer-NekoInverter/EhViewer/issues">
-    <img src="https://img.shields.io/github/issues/EhViewer-NekoInverter/EhViewer?style=flat-square" alt="Issues">
-  </a>
-</p>
+基于 [EhViewer-NekoInverter/EhViewer](https://github.com/EhViewer-NekoInverter/EhViewer)
+提交 `9e1021640472ee45f35c0bb1950723db08549b9e`，保留完整 Git 历史。
+[原始 README](docs/README.upstream.md) 按基线保存，其中下载、徽章和链接属于上游项目。
 
-<div align="center">
-  <h3>
-    <a href="#description">
-    Description
-    </a>
-    <span> | </span>
-    <a href="#download">
-    Download
-    </a>
-    <span> | </span>
-    <a href="#screenshot">
-    Screenshot
-    </a>
-    <span> | </span>
-    <a href="#thanks">
-    Thanks
-    </a>
-    <span> | </span>
-    <a href="#license">
-    License
-    </a>
-  </h3>
-</div>
+## 应用标识与版本
 
-# Description
+- applicationId：`com.haorengg12.ehreader`；debug：`com.haorengg12.ehreader.debug`。
+- namespace 保留 `com.hippo.ehviewer`，与安装包名独立。
+- versionName：`0.1.0`；versionCode：`100`。
+- 新包名从 100 独立计数，每次发布（包括预发布）必须使用更大的 versionCode，不复用旧值。
 
-An EhViewer fork with classic Material Design 2 style
+## 构建与签名
 
-This fork is for personal use and does not accept feature requests; for common usage issues, please refer to the [Q&A](https://github.com/EhViewer-NekoInverter/EhViewer/issues/18)
+需要 JDK 21、Android SDK 36、Build Tools 36.0.0、NDK 29.0.14206865 和 CMake。
+使用 Gradle Wrapper（Windows 使用 `gradlew.bat`）：
 
-If you prefer Material Design 3, consider using [EhViewer-Overhauled](https://github.com/FooIbar/EhViewer)
+```sh
+./gradlew spotlessCheck assembleDebug lintDebug testDebugUnitTest
+./gradlew assembleRelease
+```
 
-# Download
+SDK 路径通过本机 `local.properties` 或 `ANDROID_HOME` 配置。
+未配置签名时 Release 为 **unsigned** 产物，不能直接安装或作为正式发行包。
+Debug 使用 Android 标准调试签名，仅用于开发。
 
-| Android Version | Notes                        |
-|-----------------|------------------------------|
-| 6.0-8.1         | No support for animated WebP |
-| 9.0+            | Full support                 |
+正式签名须在受信任的本地环境中同时提供以下环境变量：
 
-- Please go to **[GitHub Releases](https://github.com/EhViewer-NekoInverter/EhViewer/releases)** to download the release version
+| 环境变量 | 含义 |
+| --- | --- |
+| `EHREADER_KEYSTORE_PATH` | 仓库外的私有 keystore 绝对路径 |
+| `EHREADER_STORE_PASSWORD` | keystore 密码 |
+| `EHREADER_KEY_ALIAS` | 签名密钥别名 |
+| `EHREADER_KEY_PASSWORD` | 密钥密码 |
 
-- If the release version has unresolved issues, go to **[GitHub Actions](https://github.com/EhViewer-NekoInverter/EhViewer/actions/workflows/ci.yml?query=branch%3Amaster)** to download the CI version (GitHub account login required)
+部分配置或无效 keystore 路径会使构建失败。不要将私钥、密码或含密码的配置提交到 Git。
+已移除当前源码树中的上游公开 keystore 与硬编码密码；为保留历史，旧提交仍含该公开密钥。
+它不得用于 EhReader 正式签名，必须新建并妥善备份独立私钥。
 
-# Screenshot
+CI 对 `dev`、`feature/**` 和面向 `dev` 的 PR 运行检查，上传明确标记的 debug 产物。
+原 Release 工作流仅允许手动在 `dev` 构建 unsigned APK，无标签触发、无 GitHub Release 发布步骤，
+也不读取签名 secrets。初始化阶段不发布正式 Release。
 
-![screenshot-01](https://github.com/EhViewer-NekoInverter/Arts/blob/main/screenshot-01.webp)
-![screenshot-02](https://github.com/EhViewer-NekoInverter/Arts/blob/main/screenshot-02.webp)
+## 许可证与版权
 
-# Thanks
-
-Here are the libraries
-
-- [AOSP & AndroidX](https://source.android.com/)
-- [Kotlin & KotlinX](https://kotlinlang.org/)
-- [Coil](https://coil-kt.github.io/coil/)
-- [FullDraggableDrawer](https://github.com/PureWriter/FullDraggableDrawer)
-- [Jsoup](https://jsoup.org/)
-- [Ktor](https://ktor.io/)
-- [Libarchive](http://www.libarchive.org/)
-- [MDC-Android](https://github.com/material-components/material-components-android)
-- [OkHttp](https://square.github.io/okhttp/)
-- [RikkaX](https://github.com/RikkaApps/RikkaX)
-
-Tag translation
-
-- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
-
-Translators
-
-- ja: [Re*Index. (ot_inc)](https://github.com/reindex-ot)
-
-# License
-
-    Copyright 2014-2019 Hippo Seven
-    Copyright 2020-2022 NekoInverter
-    Copyright 2022-2025 Moedog
-
-    EhViewer is free software:
-    you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation,
-    either version 3 of the License, or (at your option) any later version.
-
-    EhViewer is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-    See the GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along with EhViewer.
-    If not, see <https://www.gnu.org/licenses/>.
+本项目按 [GNU GPLv3](LICENSE) 分发。所有上游版权、文件许可证和第三方声明保持有效，
+详见 [NOTICE](NOTICE) 及源码文件头；haorengg12 不主张上游代码的版权。
+Copyright (C) 2026 haorengg12 仅适用于新增原创修改。
+分发二进制时应同时提供相应版本的完整对应源码、构建说明及许可证，并履行 GPLv3 义务。
