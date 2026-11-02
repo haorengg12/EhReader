@@ -43,7 +43,11 @@ Debug 使用 Android 标准调试签名，仅用于开发。
 
 CI 对 `dev`、`feature/**` 和面向 `dev` 的 PR 运行检查，上传明确标记的 debug 产物。
 原 Release 工作流仅允许手动在 `dev` 构建 unsigned APK，无标签触发、无 GitHub Release 发布步骤，
-也不读取签名 secrets。初始化阶段不发布正式 Release。
+也不读取签名 secrets。正式 Release 在 dev 上完成检查、使用独立私钥签名并验证 APK 后手动发布，
+仅使用 EhReader 自己的版本标签（首版为 `v0.1.0`），不得复用上游签名或标签。
+
+Windows 中文路径可在本机命令中加 `"-Pandroid.overridePathCheck=true"`；不要因此跳过编译检查。
+仓库通过 `.gitattributes` 统一文本为 LF，避免 Windows 与 CI 的格式检查产生分歧。
 
 ## 许可证与版权
 
