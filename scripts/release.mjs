@@ -103,7 +103,8 @@ function inspect() {
     if (tagExists) assert.equal(git('rev-parse', `${version.tag}^{commit}`), sha, 'Tag target conflict');
     const existing = all.find(r => r.tag_name === version.tag);
     if (existing) assert(tagExists, 'Existing release without expected tag');
-    return { ...version, sha, existing, tagExists, event };
+    const previous = history.filter(r => r.tag !== version.tag).sort((a, b) => b.code - a.code)[0];
+    return { ...version, sha, existing, tagExists, event, previousTag: previous?.tag };
 }
 
 function files(dir) {
@@ -179,20 +180,35 @@ function bundle(state) {
     write(join(out, 'SHA256SUMS.txt'), files(out).sort().map(p => `${digest(p)}  ${p.split(/[/\\]/).pop()}`).join('\n'));
 }
 
-/** 下载表参考 Aviewer，只列实际支持的 Android 包，并保留来源与验收限制。 */
-export function releaseBody(state) {
-    const base = `https://github.com/${REPO}/releases/download/${state.tag}`;
-    const labels = { 'arm64-v8a': 'ARM64（主流手机）', 'armeabi-v7a': 'ARMv7（旧设备）', x86_64: 'x86_64', universal: '通用包（不确定架构时选择）' };
-    return `# EhReader ${state.name}\n\n[![Downloads](https://img.shields.io/github/downloads/${REPO}/${state.tag}/total)](https://github.com/${REPO}/releases/tag/${state.tag})\n\n| Android 架构 | 下载 |\n| --- | --- |\n${Object.entries(labels).map(([abi, label]) => `| ${label} | [APK](${base}/EhReader-${state.name}-android-${abi}.apk) |`).join('\n')}\n\n## 更新内容\n\n本次合并：[PR #${state.event.number}](https://github.com/${REPO}/pull/${state.event.number})。详细变更见该 PR 和提交历史。\n\n## 构建与校验\n\n- 版本：${state.name} (${state.code})；Tag：${state.tag}\n- 来源提交：[${state.sha}](https://github.com/${REPO}/commit/${state.sha})\n- [构建记录](${process.env.GITHUB_SERVER_URL}/${REPO}/actions/runs/${process.env.GITHUB_RUN_ID})\n- [SHA-256 校验清单](${base}/SHA256SUMS.txt) / [验证说明](${base}/VALIDATION.txt)\n- 构建与静态检查通过；设备运行验证未执行，测试覆盖以验证说明为准。\n\n## 源码与许可\n\n[对应源码（含原生依赖）](${base}/EhReader-${state.name}-source.zip) · [GPLv3](${base}/LICENSE) · [版权与致谢](${base}/NOTICE)\n`;
+/** 只替换模板占位符一次，PR 内容作为数据保留；模板拼写错误必须在创建 Tag 前失败。 */
+export function releaseBody(state, template = readFileSync(new URL('../.github/RELEASE_TEMPLATE.md', import.meta.url), 'utf8')) {
+    const repoUrl = 'https://github.com/' + REPO;
+    const pr = state.event.pull_request;
+    const title = (pr.title || '发行合并').replace(/[\\`*_{}[\]()<>#!|]/g, '\\$&').replace(/[\r\n]+/g, ' ');
+    const summary = pr.body?.trim();
+    const values = {
+        repository: REPO, tag: state.tag, version: state.name, version_code: state.code,
+        download_base: repoUrl + '/releases/download/' + state.tag, sha: state.sha,
+        run_url: (process.env.GITHUB_SERVER_URL || 'https://github.com') + '/' + REPO + '/actions/runs/' + process.env.GITHUB_RUN_ID,
+        changes: '本次合并：[' + title + ' (#' + state.event.number + ')](' + repoUrl + '/pull/' + state.event.number + ')。' +
+            (summary ? '\n\n' + summary : '\n\n详细变更见该 PR 和提交历史。'),
+        history: state.previousTag ? '[完整变更](' + repoUrl + '/compare/' + state.previousTag + '...' + state.tag + ')' :
+            '[提交历史](' + repoUrl + '/commits/' + state.sha + ')',
+    };
+    return template.replace(/{{\s*([^{}]+?)\s*}}/g, (_, key) => {
+        assert(Object.hasOwn(values, key), 'Unknown release template placeholder: ' + key);
+        return String(values[key]);
+    });
 }
 
 /** 仅恢复同提交草稿；校验远端每个附件后才公开，绝不覆盖已公开版本。 */
 function publish() {
     const state = inspect();
     assert(!state.existing || state.existing.draft, 'Already published; rerun preflight instead');
+    const body = releaseBody(state);
     if (!state.tagExists) api('git/refs', 'POST', { ref: `refs/tags/${state.tag}`, sha: state.sha });
     const release = state.existing ?? api('releases', 'POST', {
-        tag_name: state.tag, target_commitish: state.sha, name: `EhReader ${state.tag}`, draft: true, body: releaseBody(state),
+        tag_name: state.tag, target_commitish: state.sha, name: `EhReader ${state.tag}`, draft: true, body,
     });
     const assets = files('release-assets');
     run('gh', ['release', 'upload', state.tag, ...assets, '--repo', REPO, '--clobber']);
@@ -203,7 +219,7 @@ function publish() {
         assert(asset && asset.size === readFileSync(file).length);
         assert.equal(asset.digest, `sha256:${digest(file)}`, 'Remote checksum mismatch');
     }
-    api(`releases/${release.id}`, 'PATCH', { draft: false, body: releaseBody(state), make_latest: 'true' });
+    api(`releases/${release.id}`, 'PATCH', { draft: false, name: `EhReader ${state.tag}`, body, make_latest: 'true' });
     console.log(`Published https://github.com/${REPO}/releases/tag/${state.tag}`);
 }
 
@@ -211,6 +227,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const command = process.argv[2];
     if (command === 'preflight') {
         const state = inspect();
+        releaseBody(state);
         if (state.existing && !state.existing.draft) {
             verifyPublished(state);
             console.log('This exact commit is already published; leaving immutable assets unchanged.');

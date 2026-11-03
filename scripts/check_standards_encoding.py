@@ -13,6 +13,7 @@ def main():
         "docs/STANDARDS_README.md", "docs/DEVELOPMENT_FLOW.md",
         "docs/LOCAL_DEVELOPMENT.md", "docs/REPOSITORY_WORKFLOW.md",
         "docs/RELEASE_POLICY.md",
+        ".github/RELEASE_TEMPLATE.md", "scripts/release.mjs", "scripts/release.test.mjs",
         "scripts/check_standards_encoding.py",
     ]
     paths = [Path(p) for p in sys.argv[1:]] if sys.argv[1:] else [root / p for p in defaults]

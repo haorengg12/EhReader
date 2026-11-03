@@ -9,7 +9,9 @@ const event = () => ({ action: 'closed', number: 4, repository: { full_name: REP
 test('only same-repository develop merge can publish exact merge SHA', () => {
     validateEvent(event(), 'pull_request', sha);
     for (const change of [e => e.pull_request.merged = false, e => e.pull_request.head.ref = 'feature/test',
-        e => e.pull_request.head.repo.full_name = 'other/EhReader', e => e.pull_request.base.ref = 'develop']) {
+        e => e.pull_request.head.repo.full_name = 'other/EhReader', e => e.pull_request.base.ref = 'develop',
+        e => e.pull_request.base.repo.full_name = 'other/EhReader', e => e.repository.full_name = 'other/EhReader',
+        e => e.action = 'opened']) {
         const e = event(); change(e); assert.throws(() => validateEvent(e, 'pull_request', sha));
     }
     assert.throws(() => validateEvent(event(), 'push', sha));
@@ -36,4 +38,25 @@ test('release page links all four Android packages and corresponding source', ()
     for (const abi of ['arm64-v8a', 'armeabi-v7a', 'x86_64', 'universal']) assert(text.includes(`android-${abi}.apk`));
     assert(text.includes('EhReader-0.1.1-source.zip'));
     assert(text.includes('设备运行验证未执行'));
+    assert(text.includes('# EhReader v0.1.1'));
+    assert(text.includes(`https://github.com/${REPO}/commits/${sha}`));
+    assert(!text.includes('{{'));
+    assert(!text.includes('Aviewer'));
+    assert(!text.includes('ios.ipa'));
+});
+test('release page uses merge PR notes and previous published version for full changes', () => {
+    const e = event();
+    e.pull_request.title = '发布 [修复] <阅读器>';
+    e.pull_request.body = '## 修复\n\n- 修复翻页\n- 保留示例 {{version}} 和 $&';
+    const text = releaseBody({ name: '0.1.1', code: 101, tag: 'v0.1.1', sha, event: e, previousTag: 'v0.1.0' });
+    assert(text.includes('发布 \\[修复\\] \\<阅读器\\> (#4)'));
+    assert(text.includes(e.pull_request.body));
+    assert(text.includes(`https://github.com/${REPO}/compare/v0.1.0...v0.1.1`));
+});
+test('empty PR notes fall back to history and invalid template placeholders fail', () => {
+    const e = event();
+    e.pull_request.body = '  \n';
+    const state = { name: '0.1.1', code: 101, tag: 'v0.1.1', sha, event: e };
+    assert(releaseBody(state).includes('详细变更见该 PR 和提交历史。'));
+    assert.throws(() => releaseBody(state, '{{versoin}}'), /Unknown release template placeholder: versoin/);
 });

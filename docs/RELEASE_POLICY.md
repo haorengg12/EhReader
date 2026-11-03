@@ -61,4 +61,8 @@
 
 页面包含更新内容/PR、版本与 versionCode、Tag、完整来源 SHA、CI 链接、SHA256SUMS、验证说明、GPL 和对应源码下载。设备测试未执行要明确标记；NO-SOURCE 不写作“全部测试通过”。必需附件全部上传并核对远端大小和 SHA-256 后才公开。
 
+页面模板位于 [`.github/RELEASE_TEMPLATE.md`](../.github/RELEASE_TEMPLATE.md)，由 `scripts/release.mjs` 从固定合并提交读取并渲染。更新内容自动采用合并时的 PR 标题和正文；正文为空时提供 PR 与提交历史入口。完整变更链接从上一已公开版本指向本次 Tag，首次发行则链接固定 SHA 的提交历史。恢复草稿时重新应用同提交模板和标题，不修改已公开 Release。
+
+模板可用占位符：`repository`、`tag`、`version`、`version_code`、`download_base`、`sha`、`run_url`、`changes`、`history`，均使用 `{{名称}}`。预检会验证占位符；未知名称失败停止。PR 正文中的同名文本不会被二次替换。
+
 参考：[GitHub 合并事件](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)、[并发队列](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)、[Aviewer Release 页面](https://github.com/haorengg12/Aviewer/releases/tag/v0.2.7)。
