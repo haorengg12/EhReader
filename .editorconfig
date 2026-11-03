@@ -1,3 +1,10 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
 [*.{kt,kts}]
 ij_kotlin_imports_layout = *
 ij_kotlin_line_break_after_multiline_when_entry = false

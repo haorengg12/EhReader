@@ -1,7 +1,7 @@
 # EhReader
 
 EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0.1.0 (100)**。
-开发仓库为 [haorengg12/EhReader](https://github.com/haorengg12/EhReader)，开发分支为 `dev`。
+开发仓库为 [haorengg12/EhReader](https://github.com/haorengg12/EhReader)，默认分支为 `master`，开发分支为 `develop`。
 
 基于 [EhViewer-NekoInverter/EhViewer](https://github.com/EhViewer-NekoInverter/EhViewer)
 提交 `9e1021640472ee45f35c0bb1950723db08549b9e`，保留完整 Git 历史。
@@ -17,18 +17,18 @@ EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0
 ## 构建与签名
 
 需要 JDK 21、Android SDK 36、Build Tools 36.0.0、NDK 29.0.14206865 和 CMake。
-使用 Gradle Wrapper（Windows 使用 `gradlew.bat`）：
+本地检查和 Debug 打包按 [本地开发规范](docs/LOCAL_DEVELOPMENT.md) 选择；正式包由 CI/CD 构建。Windows 使用 `gradlew.bat`，CI 使用 `./gradlew`：
 
 ```sh
 ./gradlew spotlessCheck assembleDebug lintDebug testDebugUnitTest
-./gradlew assembleRelease
+
 ```
 
 SDK 路径通过本机 `local.properties` 或 `ANDROID_HOME` 配置。
 未配置签名时 Release 为 **unsigned** 产物，不能直接安装或作为正式发行包。
 Debug 使用 Android 标准调试签名，仅用于开发。
 
-正式签名须在受信任的本地环境中同时提供以下环境变量：
+正式签名由 CI/CD 的受保护凭据提供以下环境变量，私钥和密码不得进入 Git 或公开日志：
 
 | 环境变量 | 含义 |
 | --- | --- |
@@ -41,13 +41,7 @@ Debug 使用 Android 标准调试签名，仅用于开发。
 已移除当前源码树中的上游公开 keystore 与硬编码密码；为保留历史，旧提交仍含该公开密钥。
 它不得用于 EhReader 正式签名，必须新建并妥善备份独立私钥。
 
-CI 对 `dev`、`feature/**` 和面向 `dev` 的 PR 运行检查，上传明确标记的 debug 产物。
-原 Release 工作流仅允许手动在 `dev` 构建 unsigned APK，无标签触发、无 GitHub Release 发布步骤，
-也不读取签名 secrets。正式 Release 在 dev 上完成检查、使用独立私钥签名并验证 APK 后手动发布，
-仅使用 EhReader 自己的版本标签（首版为 `v0.1.0`），不得复用上游签名或标签。
-
-Windows 中文路径可在本机命令中加 `"-Pandroid.overridePathCheck=true"`；不要因此跳过编译检查。
-仓库通过 `.gitattributes` 统一文本为 LF，避免 Windows 与 CI 的格式检查产生分歧。
+开发时先读 [AGENTS.md](AGENTS.md) 和[流程导航](docs/DEVELOPMENT_FLOW.md)，按阶段读取规范。develop 推送自动生成 Debug 附件，不创建 Tag；用户确认 develop → master 的 PR 合并后，正式 CI 按版本生成 Tag 和 Release。工作流须经批准合入 master 才生效，正式签名配置和端到端验收以实际结果为准。既有 v0.1.0 发布历史保留。
 
 ## 许可证与版权
 

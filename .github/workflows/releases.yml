@@ -1,28 +1,99 @@
-name: EhReader unsigned release validation
+name: EhReader Release
 
-# 禁止标签自动发布；此流程只生成未签名验证产物。
+# 不接受 push/tag/manual 事件；只接受同仓库 develop PR 已合并到 master。
 on:
-  workflow_dispatch:
+  pull_request:
+    types: [closed]
+    branches: [master]
 
 permissions:
   contents: read
 
+concurrency:
+  group: ehreader-official-release
+  cancel-in-progress: false
+  queue: max
+
 jobs:
-  unsigned:
-    if: github.repository == 'haorengg12/EhReader' && github.ref == 'refs/heads/dev'
+  release:
+    if: >-
+      github.repository == 'haorengg12/EhReader' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'develop' &&
+      github.event.pull_request.head.repo.full_name == 'haorengg12/EhReader'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate source event and version
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/check_standards_encoding.py
+          node --test scripts/release.test.mjs
+          node scripts/release.mjs preflight
       - uses: actions/setup-java@v5
+        if: steps.gate.outputs.published != 'true'
         with:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        if: steps.gate.outputs.published != 'true'
       - uses: gradle/actions/setup-gradle@v6
-      - name: Build unsigned release
-        run: ./gradlew spotlessCheck assembleRelease
-      - uses: actions/upload-artifact@v7
+        if: steps.gate.outputs.published != 'true'
         with:
-          name: EhReader-release-UNSIGNED-${{ github.sha }}
-          path: app/build/outputs/apk/release/*-unsigned.apk
+          cache-disabled: true
+      - name: Check and build with official signing
+        if: steps.gate.outputs.published != 'true'
+        env:
+          EHREADER_KEYSTORE_BASE64: ${{ secrets.EHREADER_KEYSTORE_BASE64 }}
+          EHREADER_STORE_PASSWORD: ${{ secrets.EHREADER_STORE_PASSWORD }}
+          EHREADER_KEY_ALIAS: ${{ secrets.EHREADER_KEY_ALIAS }}
+          EHREADER_KEY_PASSWORD: ${{ secrets.EHREADER_KEY_PASSWORD }}
+          EHREADER_KEYSTORE_PATH: ${{ runner.temp }}/ehreader-release.jks
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in EHREADER_KEYSTORE_BASE64 EHREADER_STORE_PASSWORD EHREADER_KEY_ALIAS EHREADER_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then echo "::error::Missing signing secret: $name"; exit 1; fi
+          done
+          umask 077
+          trap 'rm -f "$EHREADER_KEYSTORE_PATH"' EXIT
+          printf '%s' "$EHREADER_KEYSTORE_BASE64" | base64 --decode > "$EHREADER_KEYSTORE_PATH"
+          unset EHREADER_KEYSTORE_BASE64
+          ./gradlew --no-daemon spotlessCheck testReleaseUnitTest lintRelease assembleRelease
+      - name: Validate packages and prepare source bundle
+        if: steps.gate.outputs.published != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release.mjs bundle
+      - uses: actions/upload-artifact@v7
+        if: steps.gate.outputs.published != 'true' && success()
+        with:
+          name: EhReader-release-${{ github.event.pull_request.merge_commit_sha }}
+          path: release-assets/*
           if-no-files-found: error
+      - name: Create tag and publish complete release
+        if: steps.gate.outputs.published != 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/release.mjs publish
+      - uses: actions/upload-artifact@v7
+        if: always() && steps.gate.outputs.published != 'true'
+        with:
+          name: EhReader-release-reports-${{ github.event.pull_request.merge_commit_sha }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/mapping/release/
+            app/build/outputs/native-debug-symbols/release/
+          if-no-files-found: warn
