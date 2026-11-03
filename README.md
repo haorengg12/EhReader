@@ -27,6 +27,7 @@ EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0
 SDK 路径通过本机 `local.properties` 或 `ANDROID_HOME` 配置。
 未配置签名时 Release 为 **unsigned** 产物，不能直接安装或作为正式发行包。
 Debug 使用 Android 标准调试签名，仅用于开发。
+本地默认仅构建 arm64-v8a；GitHub Actions 构建 arm64-v8a、armeabi-v7a、x86_64 和 universal，Debug/Release 均遵守这一架构划分。
 
 正式签名由 CI/CD 的受保护凭据提供以下环境变量，私钥和密码不得进入 Git 或公开日志：
 

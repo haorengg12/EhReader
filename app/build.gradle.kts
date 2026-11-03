@@ -3,9 +3,10 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-val isRelease: Boolean
-    get() = gradle.startParameter.taskNames.any { it.contains("Release") }
 val supportedAbis = arrayOf("arm64-v8a", "x86_64", "armeabi-v7a")
+// 本地默认只构建 ARM64；GitHub CI 保留完整架构和通用包供远端验收。
+val isGitHubActions = providers.environmentVariable("GITHUB_ACTIONS").orNull == "true"
+val buildAbis = if (isGitHubActions) supportedAbis else arrayOf("arm64-v8a")
 
 plugins {
     alias(libs.plugins.android.application)
@@ -32,12 +33,8 @@ android {
         abi {
             isEnable = true
             reset()
-            if (isRelease) {
-                include(*supportedAbis)
-                isUniversalApk = true
-            } else {
-                include("x86_64", "x86")
-            }
+            include(*buildAbis)
+            isUniversalApk = isGitHubActions
         }
     }
 
@@ -87,10 +84,12 @@ android {
         buildConfigField("String", "VERSION_CODE", "\"${defaultConfig.versionCode}\"")
         buildConfigField("String", "COMMIT_SHA", "\"$commitSha\"")
         ndk {
-            if (isRelease) {
-                abiFilters.addAll(supportedAbis)
-            }
             debugSymbolLevel = "FULL"
+        }
+        externalNativeBuild {
+            cmake {
+                abiFilters.addAll(buildAbis)
+            }
         }
     }
 

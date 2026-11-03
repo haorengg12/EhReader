@@ -34,6 +34,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
       - name: Check and build debug
         run: ./gradlew spotlessCheck assembleDebug lintDebug testDebugUnitTest
+      - name: Verify debug APK architectures
+        run: python3 scripts/check_debug_apks.py
       - uses: actions/upload-artifact@v7
         with:
           name: EhReader-debug-${{ github.sha }}
