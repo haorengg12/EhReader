@@ -3,9 +3,10 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
-val isRelease: Boolean
-    get() = gradle.startParameter.taskNames.any { it.contains("Release") }
 val supportedAbis = arrayOf("arm64-v8a", "x86_64", "armeabi-v7a")
+// 本地默认只构建 ARM64；GitHub CI 保留完整架构和通用包供远端验收。
+val isGitHubActions = providers.environmentVariable("GITHUB_ACTIONS").orNull == "true"
+val buildAbis = if (isGitHubActions) supportedAbis else arrayOf("arm64-v8a")
 
 plugins {
     alias(libs.plugins.android.application)
@@ -32,22 +33,35 @@ android {
         abi {
             isEnable = true
             reset()
-            if (isRelease) {
-                include(*supportedAbis)
-                isUniversalApk = true
-            } else {
-                include("x86_64", "x86")
-            }
+            include(*buildAbis)
+            isUniversalApk = isGitHubActions
         }
     }
 
-    val signConfig = signingConfigs.create("release") {
-        storeFile = File(projectDir.path + "/keystore/androidkey.jks")
-        storePassword = "000000"
-        keyAlias = "key0"
-        keyPassword = "000000"
-        enableV3Signing = true
-        enableV4Signing = true
+    // 仅使用仓库外部提供的签名；缺少全部配置时生成明确的未签名 Release。
+    val signingVariables = listOf(
+        "EHREADER_KEYSTORE_PATH",
+        "EHREADER_STORE_PASSWORD",
+        "EHREADER_KEY_ALIAS",
+        "EHREADER_KEY_PASSWORD",
+    )
+    val signingValues = signingVariables.map { providers.environmentVariable(it).orNull }
+    require(signingValues.all { it.isNullOrBlank() } || signingValues.all { !it.isNullOrBlank() }) {
+        "Release signing requires all four EHREADER signing environment variables."
+    }
+    val signConfig = if (signingValues.all { !it.isNullOrBlank() }) {
+        signingConfigs.create("release") {
+            storeFile = rootProject.file(signingValues[0]!!)
+            require(storeFile!!.isFile) { "External release keystore does not exist." }
+            storePassword = signingValues[1]
+            keyAlias = signingValues[2]
+            keyPassword = signingValues[3]
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    } else {
+        logger.lifecycle("EhReader: release signing is not configured; Release outputs are unsigned.")
+        null
     }
 
     val commitSha by lazy {
@@ -63,16 +77,19 @@ android {
     }
 
     defaultConfig {
-        applicationId = "org.moedog.ehviewer"
-        versionCode = 180015
-        versionName = "1.8.14"
+        applicationId = "com.haorengg12.ehreader"
+        // 新包名使用独立版本序列，后续每次发布必须严格递增。
+        versionCode = 100
+        versionName = "0.1.0"
         buildConfigField("String", "VERSION_CODE", "\"${defaultConfig.versionCode}\"")
         buildConfigField("String", "COMMIT_SHA", "\"$commitSha\"")
         ndk {
-            if (isRelease) {
-                abiFilters.addAll(supportedAbis)
-            }
             debugSymbolLevel = "FULL"
+        }
+        externalNativeBuild {
+            cmake {
+                abiFilters.addAll(buildAbis)
+            }
         }
     }
 
@@ -117,6 +134,11 @@ android {
             applicationIdSuffix = ".debug"
             buildConfigField("String", "BUILD_TIME", "\"\"")
         }
+    }
+
+    // 快捷方式目标跟随最终包名，兼容带 .debug 后缀的构建。
+    applicationVariants.all {
+        resValue("string", "shortcut_target_package", applicationId)
     }
 
     buildFeatures {
