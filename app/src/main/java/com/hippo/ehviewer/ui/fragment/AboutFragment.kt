@@ -19,6 +19,7 @@ import android.os.Bundle
 import androidx.annotation.StringRes
 import androidx.preference.Preference
 import com.hippo.ehviewer.R
+import com.hippo.ehviewer.UrlOpener
 import com.hippo.util.loadHtml
 
 class AboutFragment : BasePreferenceFragment() {
@@ -26,6 +27,10 @@ class AboutFragment : BasePreferenceFragment() {
         addPreferencesFromResource(R.xml.about_settings)
         val author = findPreference<Preference>(KEY_AUTHOR)
         author!!.summary = loadHtml(getString(R.string.settings_about_author_summary).replace('$', '@'))
+        author.setOnPreferenceClickListener {
+            UrlOpener.openUrl(requireContext(), "https://github.com/haorengg12", true)
+            true
+        }
     }
 
     @get:StringRes

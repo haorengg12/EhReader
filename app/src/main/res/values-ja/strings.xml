@@ -532,9 +532,9 @@
     <string name="settings_advanced_import_data_cant_read">ファイルを読み取れませんでした</string>
     <string name="settings_advanced_open_by_default">デフォルトで開く</string>
     <string name="settings_about">このアプリについて</string>
-    <string name="settings_about_declaration_summary">EhViewer は E-Hentai.org と一切関係はありません</string>
+    <string name="settings_about_declaration_summary">EhReader は E-Hentai.org と一切関係はありません</string>
     <string name="settings_about_author">開発者</string>
-    <string name="settings_about_issues">FAQ</string>
+    <string name="settings_about_issues">問題を報告</string>
     <string name="settings_about_latest_release">最新のリリース</string>
     <string name="settings_about_source">ソースコード</string>
     <string name="settings_about_version">ビルドバージョン</string>
