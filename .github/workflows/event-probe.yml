@@ -1,0 +1,27 @@
+name: EhReader Event Probe
+
+# 临时诊断自动事件调度；无签名凭据、无构建和发布权限。
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record event identity
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          printf 'event=%s\naction=%s\nsha=%s\nref=%s\n' \
+            "$EVENT_NAME" "$EVENT_ACTION" "$SOURCE_SHA" "$SOURCE_REF"
