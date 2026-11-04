@@ -40,14 +40,17 @@ FetchContent_Declare(
         nettle
         URL https://ftp.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
         URL_MD5 b28bcbf6f045ff007940a9401673600d
-        SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/nettle/nettle
+        # 各 ABI 并发配置时必须使用各自的构建目录，避免同时解压到源码树。
+        # 保留目录名 nettle，使 <nettle/...> 头文件引用不变。
+        SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/_deps/nettle
 )
 
 FetchContent_MakeAvailable(nettle)
+set(EHREADER_NETTLE_SOURCE_DIR "${nettle_SOURCE_DIR}" CACHE INTERNAL "ABI-local Nettle source" FORCE)
 add_subdirectory(nettle)
 
 # Configure libnettle support for libarchive
-include_directories(nettle)
+include_directories("${EHREADER_NETTLE_SOURCE_DIR}/..")
 include_directories(.)
 set(HAVE_LIBNETTLE 1)
 set(HAVE_NETTLE_AES_H 1)

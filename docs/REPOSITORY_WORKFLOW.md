@@ -28,6 +28,7 @@ master 合并始终需要用户确认具体 develop 提交/PR、合并方式及�
 4. CI 成功后提供运行及附件链接，供用户验收；不能只报告“推送成功”。
 5. 提请合并时提供 develop SHA、差异摘要、CI 和验收结果、versionName/versionCode、预期 Tag，并明确合并会自动启动正式发行。
 6. 仅通过本仓库 develop → master 的 PR 合并进入自动发布。用户确认后执行指定合并；直接 push master、其他来源 PR、未合并关闭 PR、手动 Tag 都不会触发新发布流程。
+   master 应将 `build` 和 `Release readiness` 配置为 GitHub Actions 必需检查，要求分支与 master 同步，并对管理员同样生效；零必需审批人数允许仓库所有者自行合并已获确认且检查通过的 PR。保护开启时不得绕过红灯合并；需要同步 master 时先更新 develop 再等待新检查。具体启用状态需通过 GitHub API 核实。
 7. 固定实际 merge SHA 重新构建正式包，不把 develop Debug 包当正式包；继续监控发行结果并报告附件和阻碍。
 
 ## 技术启用状态

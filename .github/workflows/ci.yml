@@ -22,7 +22,7 @@ jobs:
       - name: Check standards and release gates
         run: |
           python3 scripts/check_standards_encoding.py
-          node --test scripts/release.test.mjs
+          node --test scripts/*.test.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -35,7 +35,9 @@ jobs:
       - name: Check and build debug
         run: ./gradlew spotlessCheck assembleDebug lintDebug testDebugUnitTest
       - name: Verify debug APK architectures
-        run: python3 scripts/check_debug_apks.py
+        run: |
+          python3 scripts/check_debug_apks.py
+          node scripts/native-sources.mjs
       - uses: actions/upload-artifact@v7
         with:
           name: EhReader-debug-${{ github.sha }}

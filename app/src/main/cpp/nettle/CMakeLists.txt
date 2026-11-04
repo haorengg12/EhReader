@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 3.14)
 project(nettle C)
 
 set(LIBNETTLE_DEFINITIONS
@@ -230,9 +230,13 @@ set(LIBNETTLE_SOURCES
         nettle/xts-aes256.c
         )
 
+# project(nettle) 会覆盖 nettle_SOURCE_DIR，因此使用父工程保存的实际下载路径。
+list(TRANSFORM LIBNETTLE_SOURCES REPLACE "^nettle/" "${EHREADER_NETTLE_SOURCE_DIR}/")
+
 set(LIBNETTLE_INCLUDES
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/nettle
+        ${EHREADER_NETTLE_SOURCE_DIR}
+        ${EHREADER_NETTLE_SOURCE_DIR}/..
         )
 
 add_library(nettle STATIC ${LIBNETTLE_SOURCES})

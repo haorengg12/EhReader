@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, copyFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { inspectNettleSources } from './native-sources.mjs';
 
 export const REPO = 'haorengg12/EhReader';
 export const CERT = '5496f263be3a31268e9677720c1bbb41a05c0c0705960e1e9ae1051b641c7135';
@@ -40,6 +41,28 @@ export function validateEvent(event, eventName, sha) {
     assert.equal(pr.base.ref, 'master');
     assert.match(pr.merge_commit_sha, /^[a-f0-9]{40}$/);
     assert.equal(sha, pr.merge_commit_sha);
+}
+
+/** 合并前只接受同仓库 develop → master 的候选提交；此检查不具有发布能力。 */
+export function validateCandidateEvent(event, eventName, sha) {
+    const pr = event.pull_request;
+    assert.equal(eventName, 'pull_request');
+    assert(['opened', 'synchronize', 'reopened', 'ready_for_review'].includes(event.action));
+    assert.equal(event.repository.full_name, REPO);
+    assert.equal(pr?.merged, false);
+    assert.equal(pr.head.repo.full_name, REPO, 'Only same-repository develop PRs may target master');
+    assert.equal(pr.base.repo.full_name, REPO);
+    assert.equal(pr.head.ref, 'develop', 'Only develop PRs may target master');
+    assert.equal(pr.base.ref, 'master');
+    assert.match(pr.head.sha, /^[a-f0-9]{40}$/);
+    assert.equal(sha, pr.head.sha, 'Readiness must check the exact PR head');
+}
+
+/** 候选版本不得复用任何现有 Tag 或已公开版本；只有正式合并事件可以恢复同提交发行。 */
+export function validateCandidateVersion(current, history, sha, tagExists) {
+    assert(!tagExists && !history.some(old => old.tag === current.tag),
+        `${current.tag} already exists. Update versionName and versionCode in develop before merging to master.`);
+    validateHistory(current, history, sha);
 }
 
 /** 相同版本仅允许相同提交恢复；新版本必须严格大于已发布序列。 */
@@ -83,12 +106,13 @@ function verifyPublished(state) {
 }
 
 /** 发布前及公开前都复查版本和远端标签，阻止竞争或重跑覆盖。 */
-function inspect() {
+function inspect({ candidate = false } = {}) {
     const sha = git('rev-parse', 'HEAD');
     const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-    validateEvent(event, process.env.GITHUB_EVENT_NAME, sha);
+    if (candidate) validateCandidateEvent(event, process.env.GITHUB_EVENT_NAME, sha);
+    else validateEvent(event, process.env.GITHUB_EVENT_NAME, sha);
     git('fetch', 'origin', 'master', '--tags');
-    git('merge-base', '--is-ancestor', sha, 'origin/master');
+    if (!candidate) git('merge-base', '--is-ancestor', sha, 'origin/master');
     const version = parseVersion(readFileSync('app/build.gradle.kts', 'utf8'));
     const all = releases();
     const history = all.filter(r => !r.draft).map(r => {
@@ -98,8 +122,9 @@ function inspect() {
         assert.equal(old.tag, r.tag_name);
         return { ...old, sha: oldSha };
     });
-    validateHistory(version, history, sha);
     const tagExists = git('tag', '--list', version.tag) === version.tag;
+    if (candidate) validateCandidateVersion(version, history, sha, tagExists);
+    else validateHistory(version, history, sha);
     if (tagExists) assert.equal(git('rev-parse', `${version.tag}^{commit}`), sha, 'Tag target conflict');
     const existing = all.find(r => r.tag_name === version.tag);
     if (existing) assert(tagExists, 'Existing release without expected tag');
@@ -165,10 +190,11 @@ function bundle(state) {
         run('rm', [join(source, `${dep}.tar`)]);
         details.push(`${dep}: ${heads[0]} (build source, patches included)`);
     }
-    const nettle = 'app/src/main/cpp/nettle/nettle';
-    assert(existsSync(`${nettle}/aes128-encrypt.c`) && readdirSync(nettle).some(p => p.startsWith('COPYING')), 'Missing nettle source');
+    const nettleSources = inspectNettleSources('app/.cxx', 'Release', expected.filter(abi => abi !== 'universal'));
+    const nettle = nettleSources[0].source;
     mkdirSync(join(source, 'third-party/nettle'), { recursive: true });
     run('cp', ['-a', `${nettle}/.`, join(source, 'third-party/nettle')]);
+    details.push(`nettle: 3.10.2, source SHA256 ${nettleSources[0].digest} (identical ABI-local source trees)`);
     write(join(source, 'BUILD-SOURCE.txt'), `Commit: ${state.sha}\nBuild: JDK 21, SDK 36, NDK 29.0.14206865; ./gradlew assembleRelease lintRelease\nNative dependencies used by this build are in third-party (nettle 3.10.2).\nSee app/src/main/cpp/CMakeLists.txt for FetchContent configuration.\nTo use bundled native sources offline, pass FETCHCONTENT_SOURCE_DIR_LIBLZMA, FETCHCONTENT_SOURCE_DIR_LIBARCHIVE and FETCHCONTENT_SOURCE_DIR_NETTLE as CMake absolute paths.\n${details.join('\n')}`);
     run('zip', ['-qr', join(out, `EhReader-${state.name}-source.zip`), '.'], { cwd: source });
     for (const name of ['LICENSE', 'NOTICE']) copyFileSync(name, join(out, name));
@@ -225,7 +251,13 @@ function publish() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
     const command = process.argv[2];
-    if (command === 'preflight') {
+    if (command === 'readiness') {
+        const state = inspect({ candidate: true });
+        assert.equal(process.env.SIGNING_CONFIGURED, 'true', 'Configure all four EHREADER signing Secrets before merging to master.');
+        const message = `Release readiness: ${state.tag} (${state.code}), candidate ${state.sha}. No Tag or Release was created.`;
+        console.log(message);
+        if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`, { flag: 'a' });
+    } else if (command === 'preflight') {
         const state = inspect();
         releaseBody(state);
         if (state.existing && !state.existing.draft) {
@@ -235,5 +267,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         writeFileSync(process.env.GITHUB_OUTPUT, `published=${Boolean(state.existing && !state.existing.draft)}\n`, { flag: 'a' });
     } else if (command === 'bundle') bundle(inspect());
     else if (command === 'publish') publish();
-    else throw new Error('Expected preflight, bundle or publish');
+    else throw new Error('Expected readiness, preflight, bundle or publish');
 }

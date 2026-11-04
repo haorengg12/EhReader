@@ -14,6 +14,7 @@
 - 正式版 versionName 使用三段数字，例如 0.1.1；Tag 固定为 v 加 versionName，例如 v0.1.1。本规范不定义预发布版自动发布，若需要须先确定预发布命名和排序规则。
 - versionCode 为正整数，新发行必须严格大于本项目历史已公开发行的最大值；同一个版本的失败重试不增加 versionCode。比较不能混入上游旧应用的版本序列。
 - 版本更新先作为 develop 提交审查，用户合并确认包含该版本。CI 从提交配置派生 Tag，不修改源码、不自动增加数字、不因重跑生成新版本。
+- 目标 master 的 PR 必须通过独立 `Release readiness` 检查：仅接受同仓库 develop，固定 PR head SHA，检查未使用的 Tag、严格递增的版本和四项签名 Secrets 是否齐备。该只读检查不创建 Tag/Release，也不代替合并后的正式门禁。develop 普通 push 仍可使用当前开发版本，不因每次日常开发自动升版。
 - 更换 Tag 名称不会改变提交中的 APK 版本。不能把同一版本提交反复标为不同正式发行；版本缺失或冲突须在合并前解决。
 - Tag 格式借鉴上游 v* 命名；上游工作流及 Aviewer 没有提供可直接沿用的“合并后自动递增版本”算法。
 
@@ -48,12 +49,13 @@
 ## 实现与签名配置
 
 - `.github/workflows/ci.yml`：develop push、目标 develop/master 的 PR 验证，上传 Debug 与检查报告，只读权限。
+- `.github/workflows/release-readiness.yml`：仅目标 master 的 PR 运行 `Release readiness`，在合并前报告版本复用和签名配置缺失。独立工作流避免 develop push 上的 skipped 同名检查干扰必需检查结果。
 - `.github/workflows/releases.yml`：仅已合并 PR 事件，核对同仓库 develop 来源、master 目标；固定 merge_commit_sha。直接 push master、手动触发、push Tag 不发布。GitHub 的已合并 PR 事件用于区分真正合并与普通推送。
-- `scripts/release.mjs`：版本/事件门禁、包校验、源码附件、Release 草稿和远端附件散列核验。`scripts/release.test.mjs` 验证误触发和版本冲突边界。
+- `scripts/release.mjs`：合并前只读 readiness、合并后版本/事件门禁、包校验、源码附件、Release 草稿和远端附件散列核验。`scripts/release.test.mjs` 验证误触发和版本冲突边界。`scripts/native-sources.mjs` 从每个 ABI 的 CMakeCache 找到隔离的 Nettle 源码，比较实际源码散列后打包，禁止回退到共享旧目录。
 - 正式 CI 所需 repository Secrets：EHREADER_KEYSTORE_BASE64、EHREADER_STORE_PASSWORD、EHREADER_KEY_ALIAS、EHREADER_KEY_PASSWORD。私钥使用 v0.1.0 的同一 EhReader 密钥，不能重新生成另一把；证书 SHA-256 固定在发布脚本。仅在获准时将密钥配置到 GitHub，禁止写入 Git 或输出密码。
 - 工作流临时解码 keystore 到 runner.temp，权限 600，构建结束删除；不缓存正式构建，凭据只传给签名构建步骤。
 - 失败后重跑原合并事件；不提供绕过合并条件的手动发布入口。已公开版本不覆盖；同提交草稿可补全，标签冲突失败。
-- 首次迁移当前 0.1.0 (100) 已存在，合并前必须在 develop 准备新版本，不能靠修改 Tag 名字规避版本冲突。
+- 既有 0.1.0 (100)、0.1.1 (101) 不得复用；版本历史始终从远端公开发行读取，不能靠修改 Tag 名字规避版本冲突。
 
 ## Release 页面
 
