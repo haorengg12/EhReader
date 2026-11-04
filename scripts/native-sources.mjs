@@ -1,7 +1,7 @@
 // Copyright (C) 2026 haorengg12. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -10,7 +10,11 @@ const files = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
 
 /** 核对每个 ABI 的实际 CMake 源码位置及内容，防止共享解压目录回归和发行源码串包。 */
 export function inspectNettleSources(cxxRoot, buildType, expectedAbis) {
-    const caches = files(join(cxxRoot, buildType)).filter(p => basename(p) === 'CMakeCache.txt');
+    // AGP 的 Release 变体通常使用 RelWithDebInfo，不能把 Android 变体名当作 CMake 目录名。
+    const types = buildType === 'Release' ? ['Release', 'RelWithDebInfo', 'MinSizeRel'] : [buildType];
+    const roots = types.map(type => join(cxxRoot, type)).filter(existsSync);
+    assert(roots.length > 0, `Missing ${buildType} CMake configuration`);
+    const caches = roots.flatMap(files).filter(p => basename(p) === 'CMakeCache.txt');
     const sources = [];
     for (const cache of caches) {
         const abi = basename(dirname(cache));
@@ -38,7 +42,9 @@ export function inspectNettleSources(cxxRoot, buildType, expectedAbis) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+    const buildType = process.argv[2] ?? 'Debug';
+    assert(['Debug', 'Release'].includes(buildType), 'Expected Debug or Release native configuration');
     const abis = process.env.GITHUB_ACTIONS === 'true' ? ['arm64-v8a', 'armeabi-v7a', 'x86_64'] : ['arm64-v8a'];
-    const sources = inspectNettleSources('app/.cxx', 'Debug', abis);
-    console.log(`Verified ABI-local Nettle sources: ${sources.map(s => s.abi).join(', ')}`);
+    const sources = inspectNettleSources('app/.cxx', buildType, abis);
+    console.log(`Verified ${buildType} ABI-local Nettle sources: ${sources.map(s => s.abi).join(', ')}`);
 }
