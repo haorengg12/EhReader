@@ -540,9 +540,9 @@
     <string name="settings_advanced_import_data_cant_read">無法讀取文件</string>
     <string name="settings_advanced_open_by_default">默認打開</string>
     <string name="settings_about">關於</string>
-    <string name="settings_about_declaration_summary">EhViewer 與 E-Hentai.org 無任何聯繫</string>
+    <string name="settings_about_declaration_summary">EhReader 與 E-Hentai.org 無任何聯繫</string>
     <string name="settings_about_author">作者</string>
-    <string name="settings_about_issues">常見問題</string>
+    <string name="settings_about_issues">問題回報</string>
     <string name="settings_about_latest_release">最新版本</string>
     <string name="settings_about_source">源碼</string>
     <string name="settings_about_version">版本號</string>

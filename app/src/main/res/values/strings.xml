@@ -569,11 +569,11 @@
     <string name="settings_advanced_import_data_cant_read">Can\'t read the file</string>
     <string name="settings_advanced_open_by_default">Open by default</string>
     <string name="settings_about">About</string>
-    <string name="settings_about_declaration" translatable="false">EhViewer</string>
-    <string name="settings_about_declaration_summary">EhViewer is not affiliated with E-Hentai.org in any way</string>
+    <string name="settings_about_declaration" translatable="false">EhReader</string>
+    <string name="settings_about_declaration_summary">EhReader is not affiliated with E-Hentai.org in any way</string>
     <string name="settings_about_author">Author</string>
-    <string name="settings_about_author_summary" translatable="false">&lt;del&gt;Hippo &amp;lt;ehviewersu$gmail.com&amp;gt;&lt;/del&gt;&lt;br&gt;&lt;del&gt;NekoInverter&lt;/del&gt;&lt;br&gt;小白-白</string>
-    <string name="settings_about_issues">FAQ</string>
+    <string name="settings_about_author_summary" translatable="false">&lt;del&gt;Hippo &amp;lt;ehviewersu$gmail.com&amp;gt;&lt;/del&gt;&lt;br&gt;&lt;del&gt;NekoInverter&lt;/del&gt;&lt;br&gt;&lt;del&gt;小白白&lt;/del&gt;&lt;br&gt;haorengg12</string>
+    <string name="settings_about_issues">Issue tracker</string>
     <string name="settings_about_latest_release">Latest release</string>
     <string name="settings_about_source">Source</string>
     <string name="settings_about_version">Build version</string>

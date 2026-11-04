@@ -33,21 +33,21 @@
         android:title="@string/settings_about_issues"
         app:enableCopying="true"
         app:iconSpaceReserved="false"
-        app:url="https://github.com/EhViewer-NekoInverter/EhViewer/issues/18" />
+        app:url="https://github.com/haorengg12/EhReader/issues" />
 
     <com.hippo.preference.UrlPreference
         android:key="latest_release"
         android:title="@string/settings_about_latest_release"
         app:enableCopying="true"
         app:iconSpaceReserved="false"
-        app:url="https://github.com/EhViewer-NekoInverter/EhViewer/releases" />
+        app:url="https://github.com/haorengg12/EhReader/releases" />
 
     <com.hippo.preference.UrlPreference
         android:key="source"
         android:title="@string/settings_about_source"
         app:enableCopying="true"
         app:iconSpaceReserved="false"
-        app:url="https://github.com/EhViewer-NekoInverter/EhViewer" />
+        app:url="https://github.com/haorengg12/EhReader" />
 
     <com.hippo.ehviewer.preference.VersionPreference
         android:key="version"
