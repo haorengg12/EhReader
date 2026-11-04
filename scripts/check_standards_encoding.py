@@ -14,6 +14,9 @@ def main():
         "docs/LOCAL_DEVELOPMENT.md", "docs/REPOSITORY_WORKFLOW.md",
         "docs/RELEASE_POLICY.md",
         ".github/RELEASE_TEMPLATE.md", "scripts/release.mjs", "scripts/release.test.mjs",
+        "scripts/native-sources.mjs", "scripts/native-sources.test.mjs",
+        ".github/workflows/ci.yml", ".github/workflows/releases.yml",
+        ".github/workflows/release-readiness.yml",
         "scripts/check_standards_encoding.py",
     ]
     paths = [Path(p) for p in sys.argv[1:]] if sys.argv[1:] else [root / p for p in defaults]

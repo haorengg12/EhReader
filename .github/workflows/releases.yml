@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/check_standards_encoding.py
-          node --test scripts/release.test.mjs
+          node --test scripts/*.test.mjs
           node scripts/release.mjs preflight
       - uses: actions/setup-java@v5
         if: steps.gate.outputs.published != 'true'

@@ -1,0 +1,28 @@
+name: EhReader Release Readiness
+
+# 仅在 master PR 上产生必需检查，避免 develop push 的 skipped 状态混入同名检查。
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    name: Release readiness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check unused release version and signing availability
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING_CONFIGURED: ${{ secrets.EHREADER_KEYSTORE_BASE64 != '' && secrets.EHREADER_STORE_PASSWORD != '' && secrets.EHREADER_KEY_ALIAS != '' && secrets.EHREADER_KEY_PASSWORD != '' }}
+        run: node scripts/release.mjs readiness

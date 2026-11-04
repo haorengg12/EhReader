@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVersion, validateEvent, validateHistory, releaseBody, REPO } from './release.mjs';
+import { parseVersion, validateEvent, validateHistory, validateCandidateEvent, validateCandidateVersion, releaseBody, REPO } from './release.mjs';
 const sha = 'a'.repeat(40);
 const event = () => ({ action: 'closed', number: 4, repository: { full_name: REPO }, pull_request: {
     merged: true, merge_commit_sha: sha,
@@ -24,6 +24,31 @@ test('versions reject malformed or ambiguous configuration', () => {
         'versionName = "0.1.1"\nversionCode = 0', 'versionName = "0.1.1"\nversionCode = 101\nversionCode = 102']) {
         assert.throws(() => parseVersion(source));
     }
+});
+test('PR readiness checks exact same-repository develop head without allowing publication', () => {
+    const e = event();
+    e.action = 'opened';
+    e.pull_request.merged = false;
+    e.pull_request.head.sha = sha;
+    validateCandidateEvent(e, 'pull_request', sha);
+    assert.throws(() => validateEvent(e, 'pull_request', sha));
+    assert.throws(() => validateCandidateEvent(e, 'workflow_dispatch', sha));
+    assert.throws(() => validateCandidateEvent(e, 'pull_request', 'b'.repeat(40)));
+    for (const change of [e => e.pull_request.head.ref = 'feature/test',
+        e => e.pull_request.head.repo.full_name = 'other/EhReader', e => e.pull_request.base.ref = 'develop',
+        e => e.pull_request.merged = true, e => e.action = 'closed']) {
+        const changed = structuredClone(e); change(changed);
+        assert.throws(() => validateCandidateEvent(changed, 'pull_request', sha));
+    }
+});
+test('PR readiness rejects published versions, orphan tags and non-increasing version codes', () => {
+    const old = { name: '0.1.1', code: 101, tag: 'v0.1.1', sha };
+    const next = { name: '0.1.2', code: 102, tag: 'v0.1.2' };
+    validateCandidateVersion(next, [old], sha, false);
+    assert.throws(() => validateCandidateVersion(old, [old], sha, true), /Update versionName and versionCode/);
+    assert.throws(() => validateCandidateVersion(old, [old], sha, false), /already exists/);
+    assert.throws(() => validateCandidateVersion(next, [old], sha, true), /already exists/);
+    assert.throws(() => validateCandidateVersion({ ...next, code: 101 }, [old], sha, false), /versionCode must exceed/);
 });
 test('published history prevents version reuse, downgrade and moved tags', () => {
     const old = { name: '0.1.0', code: 100, tag: 'v0.1.0', sha };
