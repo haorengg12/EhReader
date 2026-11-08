@@ -8,18 +8,21 @@ def main():
     """检查指定文件或默认规范文件，发现编码或换行问题时返回失败。"""
     root = Path(__file__).resolve().parents[1]
     defaults = [
-        "AGENTS.md", "README.md", ".editorconfig", "docs/CODING_STANDARDS.md",
-        "docs/ARCHITECTURE.md", "docs/TESTING_STANDARDS.md",
-        "docs/STANDARDS_README.md", "docs/DEVELOPMENT_FLOW.md",
-        "docs/LOCAL_DEVELOPMENT.md", "docs/REPOSITORY_WORKFLOW.md",
-        "docs/RELEASE_POLICY.md",
+        "AGENTS.md", "README.md", ".editorconfig", ".agents/docs/CODING_STANDARDS.md",
+        ".agents/docs/ARCHITECTURE.md", ".agents/docs/TESTING_STANDARDS.md",
+        ".agents/docs/STANDARDS_README.md", ".agents/docs/DEVELOPMENT_FLOW.md",
+        ".agents/docs/LOCAL_DEVELOPMENT.md", ".agents/docs/REPOSITORY_WORKFLOW.md",
+        ".agents/docs/RELEASE_POLICY.md",
+        ".agents/docs/DEVELOPMENT_FLOWCHART.md", ".agents/docs/ACCEPTANCE.md",
         ".github/RELEASE_TEMPLATE.md", "scripts/release.mjs", "scripts/release.test.mjs",
         "scripts/native-sources.mjs", "scripts/native-sources.test.mjs",
         ".github/workflows/ci.yml", ".github/workflows/releases.yml",
         ".github/workflows/release-readiness.yml",
         "scripts/check_standards_encoding.py",
     ]
-    paths = [Path(p) for p in sys.argv[1:]] if sys.argv[1:] else [root / p for p in defaults]
+    paths = [Path(p) for p in sys.argv[1:]] if sys.argv[1:] else sorted(
+        set([root / p for p in defaults] + list((root / "scripts").rglob("*.mjs")))
+    )
     failures = []
     for path in paths:
         try:

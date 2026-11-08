@@ -2,27 +2,75 @@ name: EhReader CI
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, 'brody-*']
   pull_request:
     branches: [develop, master]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
+    inputs:
+      repair_debug:
+        description: Revalidate a failed development version at this develop SHA
+        type: boolean
+        default: false
+      base_sha:
+        description: Fixed original pre-version-change SHA (required for Debug repair or initial snapshot validation)
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    if: github.repository == 'haorengg12/EhReader' && (github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/develop')
+  quality:
+    name: Basic quality
+    if: github.repository == 'haorengg12/EhReader' && github.event.deleted != true
     runs-on: ubuntu-latest
+    outputs:
+      debug: ${{ steps.route.outputs.debug }}
+      version: ${{ steps.route.outputs.version }}
+      sha: ${{ steps.route.outputs.sha }}
+      base: ${{ steps.route.outputs.base }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Check standards and release gates
         run: |
           python3 scripts/check_standards_encoding.py
+          node scripts/check-docs.mjs
           node --test scripts/*.test.mjs
+      - name: Select version path from fixed event SHAs
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci.mjs plan
+
+  debug:
+    name: Development Debug
+    needs: quality
+    if: >-
+      needs.quality.outputs.debug == 'true' &&
+      github.repository == 'haorengg12/EhReader' &&
+      github.ref == 'refs/heads/develop' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ehreader-dev-${{ needs.quality.outputs.version }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.quality.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -40,14 +88,41 @@ jobs:
           node scripts/native-sources.mjs
       - uses: actions/upload-artifact@v7
         with:
-          name: EhReader-debug-${{ github.sha }}
+          name: EhReader-debug-${{ needs.quality.outputs.sha }}
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: EhReader-checks-${{ github.sha }}
+          name: EhReader-checks-${{ needs.quality.outputs.sha }}
           path: |
             app/build/reports/
             app/build/test-results/
           if-no-files-found: warn
+
+  development-tag:
+    name: Development tag
+    needs: [quality, debug]
+    if: >-
+      needs.quality.result == 'success' && needs.debug.result == 'success' &&
+      needs.quality.outputs.debug == 'true' &&
+      github.repository == 'haorengg12/EhReader' && github.ref == 'refs/heads/develop' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.quality.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Create immutable development tag after successful checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          DEBUG_RESULT: ${{ needs.debug.result }}
+        run: node scripts/ci.mjs tag

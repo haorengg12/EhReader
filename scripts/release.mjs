@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, copyFileSync, writeFi
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { inspectNettleSources } from './native-sources.mjs';
+import { parseAppVersion, validateOfficialVersion, versionPath } from './version-policy.mjs';
 
 export const REPO = 'haorengg12/EhReader';
 export const CERT = '5496f263be3a31268e9677720c1bbb41a05c0c0705960e1e9ae1051b641c7135';
@@ -18,14 +19,9 @@ const write = (file, text) => writeFileSync(file, `${text.trimEnd()}\n`, 'utf8')
 
 /** 严格解析唯一版本来源；不猜测、不自动修改发行版本。 */
 export function parseVersion(source) {
-    const names = [...source.matchAll(/^\s*versionName\s*=\s*"([^"\n]+)"\s*$/gm)];
-    const codes = [...source.matchAll(/^\s*versionCode\s*=\s*(\d+)\s*$/gm)];
-    assert.equal(names.length, 1, 'Exactly one versionName is required');
-    assert.equal(codes.length, 1, 'Exactly one versionCode is required');
-    assert.match(names[0][1], /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/);
-    const code = Number(codes[0][1]);
-    assert(Number.isSafeInteger(code) && code > 0 && code <= 2100000000, 'Invalid versionCode');
-    return { name: names[0][1], code, tag: `v${names[0][1]}` };
+    const version = parseAppVersion(source);
+    assert.equal(version.name.split('.').length, 3, 'Official versions require three components');
+    return version;
 }
 
 /** 只接受同仓库 develop 合入 master；固定事件中的合并结果。 */
@@ -47,7 +43,7 @@ export function validateEvent(event, eventName, sha) {
 export function validateCandidateEvent(event, eventName, sha) {
     const pr = event.pull_request;
     assert.equal(eventName, 'pull_request');
-    assert(['opened', 'synchronize', 'reopened', 'ready_for_review'].includes(event.action));
+    assert(['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited'].includes(event.action));
     assert.equal(event.repository.full_name, REPO);
     assert.equal(pr?.merged, false);
     assert.equal(pr.head.repo.full_name, REPO, 'Only same-repository develop PRs may target master');
@@ -63,6 +59,7 @@ export function validateCandidateVersion(current, history, sha, tagExists) {
     assert(!tagExists && !history.some(old => old.tag === current.tag),
         `${current.tag} already exists. Update versionName and versionCode in develop before merging to master.`);
     validateHistory(current, history, sha);
+    validateOfficialVersion(current, history);
 }
 
 /** 相同版本仅允许相同提交恢复；新版本必须严格大于已发布序列。 */
@@ -120,7 +117,7 @@ function inspect({ candidate = false } = {}) {
         const oldSha = git('rev-parse', `${r.tag_name}^{commit}`);
         const old = parseVersion(git('show', `${oldSha}:app/build.gradle.kts`));
         assert.equal(old.tag, r.tag_name);
-        return { ...old, sha: oldSha };
+        return { ...old, sha: oldSha, formal: !r.prerelease };
     });
     const tagExists = git('tag', '--list', version.tag) === version.tag;
     if (candidate) validateCandidateVersion(version, history, sha, tagExists);
@@ -128,7 +125,16 @@ function inspect({ candidate = false } = {}) {
     if (tagExists) assert.equal(git('rev-parse', `${version.tag}^{commit}`), sha, 'Tag target conflict');
     const existing = all.find(r => r.tag_name === version.tag);
     if (existing) assert(tagExists, 'Existing release without expected tag');
-    const previous = history.filter(r => r.tag !== version.tag).sort((a, b) => b.code - a.code)[0];
+    if (!existing || existing.draft) {
+        if (candidate) {
+            const base = event.pull_request.base.sha;
+            assert.match(base || '', /^[a-f0-9]{40}$/, 'Fixed PR base SHA is required');
+            git('merge-base', '--is-ancestor', base, sha);
+            assert.equal(versionPath(parseVersion(git('show', `${base}:app/build.gradle.kts`)), version), 'official', 'Only major/minor changes may enter official release');
+        }
+        validateOfficialVersion(version, history);
+    }
+    const previous = history.filter(r => r.tag !== version.tag && r.formal).sort((a, b) => b.code - a.code)[0];
     return { ...version, sha, existing, tagExists, event, previousTag: previous?.tag };
 }
 
@@ -247,6 +253,7 @@ function publish() {
     }
     api(`releases/${release.id}`, 'PATCH', { draft: false, name: `EhReader ${state.tag}`, body, make_latest: 'true' });
     console.log(`Published https://github.com/${REPO}/releases/tag/${state.tag}`);
+    if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY, `Published ${state.tag}\nSource: ${state.sha}\nhttps://github.com/${REPO}/releases/tag/${state.tag}\nAll required remote assets verified.\n`, { flag: 'a' });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
