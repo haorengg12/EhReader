@@ -43,12 +43,13 @@ test('PR readiness checks exact same-repository develop head without allowing pu
 });
 test('PR readiness rejects published versions, orphan tags and non-increasing version codes', () => {
     const old = { name: '0.1.1', code: 101, tag: 'v0.1.1', sha };
-    const next = { name: '0.1.2', code: 102, tag: 'v0.1.2' };
+    const next = { name: '0.2.0', code: 102, tag: 'v0.2.0' };
     validateCandidateVersion(next, [old], sha, false);
     assert.throws(() => validateCandidateVersion(old, [old], sha, true), /Update versionName and versionCode/);
     assert.throws(() => validateCandidateVersion(old, [old], sha, false), /already exists/);
     assert.throws(() => validateCandidateVersion(next, [old], sha, true), /already exists/);
     assert.throws(() => validateCandidateVersion({ ...next, code: 101 }, [old], sha, false), /versionCode must exceed/);
+    assert.throws(() => validateCandidateVersion({ name: '0.1.2', code: 102, tag: 'v0.1.2' }, [old], sha, false), /major or minor/);
 });
 test('published history prevents version reuse, downgrade and moved tags', () => {
     const old = { name: '0.1.0', code: 100, tag: 'v0.1.0', sha };
