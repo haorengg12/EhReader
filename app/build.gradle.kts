@@ -79,8 +79,8 @@ android {
     defaultConfig {
         applicationId = "com.haorengg12.ehreader"
         // 新包名使用独立版本序列，后续每次发布必须严格递增。
-        versionCode = 10815
-        versionName = "1.8.15"
+        versionCode = 10816
+        versionName = "1.8.15.1"
         buildConfigField("String", "VERSION_CODE", "\"${defaultConfig.versionCode}\"")
         buildConfigField("String", "COMMIT_SHA", "\"$commitSha\"")
         ndk {

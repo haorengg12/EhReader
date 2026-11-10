@@ -534,7 +534,7 @@
     <string name="settings_advanced_export_data_summary">儲存資料至外接儲存設備，例如下載列表，快速搜尋列表</string>
     <string name="settings_advanced_export_data_to">已匯出資料至 %s</string>
     <string name="settings_advanced_export_data_failed">無法匯出資料</string>
-    <string name="settings_advanced_import_data">匯入檔案</string>
+    <string name="settings_advanced_import_data">匯入資料</string>
     <string name="settings_advanced_import_data_summary">從之前儲存的檔案匯入</string>
     <string name="settings_advanced_import_data_successfully">成功將資料匯入</string>
     <string name="settings_advanced_import_data_cant_read">無法讀取檔案</string>
@@ -639,4 +639,10 @@
     <string name="gallery_detail_local_error">正在顯示本機儲存的畫廊資訊。%1$s</string>
     <string name="gallery_detail_not_saved">未儲存</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5（評分人數未儲存）</string>
+    <string name="settings_compatibility">相容性</string>
+    <string name="settings_compatibility_import_legacy">匯入舊版本EhViewer資料</string>
+    <string name="settings_compatibility_import_legacy_summary">匯入舊版本 EhViewer 的資料，尚未開放。</string>
+    <string name="settings_compatibility_restore_downloads">還原下載項目（舊版本）</string>
+    <string name="settings_compatibility_restore_downloads_summary">遷移舊版本下載目錄中的本機檔案，尚未開放。</string>
+    <string name="settings_compatibility_unavailable">此功能尚未開放</string>
 </resources>

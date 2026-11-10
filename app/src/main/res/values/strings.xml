@@ -563,7 +563,7 @@
     <string name="settings_advanced_export_data_summary">Back up metadata, downloads, history, favorites, bookmarks, rules, locations and reading progress. Images, settings and directory permissions are not included.</string>
     <string name="settings_advanced_export_data_to">Exported data to %s</string>
     <string name="settings_advanced_export_data_failed">Failed to export data</string>
-    <string name="settings_advanced_import_data">Restore EhReader backup</string>
+    <string name="settings_advanced_import_data">Import data</string>
     <string name="settings_advanced_import_data_summary">Merge a new-format database backup including metadata and reading progress. Pause downloads first, then select a download root and reconnect files. Old EhViewer backups require the separate legacy importer.</string>
     <string name="settings_advanced_import_data_successfully">Data imported</string>
     <string name="settings_advanced_import_data_cant_read">Cannot restore this backup. Pause downloads and select a new-format EhReader database. Old EhViewer databases are not supported here.</string>
@@ -709,4 +709,10 @@
     <string name="gallery_detail_local_error">Showing saved gallery information. %1$s</string>
     <string name="gallery_detail_not_saved">Not saved</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5 (rating count not saved)</string>
+    <string name="settings_compatibility">Compatibility</string>
+    <string name="settings_compatibility_import_legacy">Import legacy EhViewer data</string>
+    <string name="settings_compatibility_import_legacy_summary">Import data from an older EhViewer version. Not available yet.</string>
+    <string name="settings_compatibility_restore_downloads">Restore downloads (legacy)</string>
+    <string name="settings_compatibility_restore_downloads_summary">Migrate local downloads from an older version. Not available yet.</string>
+    <string name="settings_compatibility_unavailable">This feature is not available yet.</string>
 </resources>

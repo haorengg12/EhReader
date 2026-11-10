@@ -629,4 +629,10 @@
     <string name="gallery_detail_local_error">保存済みのギャラリー情報を表示しています。%1$s</string>
     <string name="gallery_detail_not_saved">未保存</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5（評価数は未保存）</string>
+    <string name="settings_compatibility">互換性</string>
+    <string name="settings_compatibility_import_legacy">旧バージョンのEhViewerデータをインポート</string>
+    <string name="settings_compatibility_import_legacy_summary">旧バージョンの EhViewer のデータをインポートします。現在は利用できません。</string>
+    <string name="settings_compatibility_restore_downloads">ダウンロードを復元（旧バージョン）</string>
+    <string name="settings_compatibility_restore_downloads_summary">旧バージョンのローカルダウンロードを移行します。現在は利用できません。</string>
+    <string name="settings_compatibility_unavailable">この機能はまだ利用できません。</string>
 </resources>

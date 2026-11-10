@@ -51,6 +51,7 @@ open class BasePreferenceFragment :
             "download" -> DownloadFragment()
             "privacy" -> PrivacyFragment()
             "advanced" -> AdvancedFragment()
+            "compatibility" -> CompatibilityFragment()
             "about" -> AboutFragment()
             "uconfig" -> UConfigFragment()
             "mytags" -> MyTagsFragment()

@@ -1,25 +1,25 @@
-# 版本与发布规范 — V2.3
+# 版本与发布规范 — V2.4
 
 本文件是版本号、正式构建、签名、Tag、Release 和重试的权威来源。用户权限和启用条件见 [仓库管理规范](REPOSITORY_WORKFLOW.md)。工作流由 develop 提交，获准合入 master 后生效；签名和正式发布端到端验收须另外核实。
 
 ## 按版本位置分流（目标规则）
 
-2026-11-05 起，版本按 `一.二.三[.四]` 分流。三段版本用于 develop 开发构建或 master 正式发行，第四段仅用于远端临时保存；这是一套项目自定义规则。版本变化决定流程，推送 Tag 本身不触发构建或发布。
+2026-11-05 起，版本按 `一.二.三[.四]` 分流。三段版本用于 develop 开发构建或 master 正式发行，2026-11-10 起第四段用于测试版，保存在 develop 并可生成 Debug 包；这是一套项目自定义规则。版本变化决定流程，推送 Tag 本身不触发构建或发布。
 
 | 变化 | 示例 | 推送与后续动作 |
 | --- | --- | --- |
 | 仅第三位提高，第一、二位不变 | `0.1.2 → 0.1.3` | 只推送 origin/develop；运行开发 CI，检查并生成 Debug 产物；成功后在本次完整 SHA 创建 `v0.1.3` 开发 Tag；不创建 Release，不进入 master 合并流程 |
 | 第一或第二位提高 | `0.1.2 → 1.0.0` / `0.2.0` | 先推送 origin/develop，跳过该 push 的开发构建；准备同仓库 develop → master PR，经只读预检和用户对具体提交及版本的确认后合并；合并事件固定 SHA 执行完整 CI/CD，成功后创建正式 Tag 和 Release |
-| 仅第四位提高，前三位不变 | `1.0.1 → 1.0.1.12` | 从明确源 SHA 创建并推送对应 brody 分支，执行基础验证；不打包、不创建 Tag/Release、不自动合并 |
+| 仅第四位提高，前三位不变 | `1.8.15 → 1.8.15.1` | 在 develop 保存；用户要求时本地生成 Debug，获准推送后运行基础验证及 Debug 测试构建；不创建 Tag/Release、不自动合并 |
 | 版本不变 | `0.1.3 → 0.1.3` | 获准后可推送 develop 保存；普通 push 不启动开发构建、不创建 Tag，也不自动进入正式发行 |
 
 ### 基础验证与打包分离（P1-13）
 
 基础验证不以升版为前提：develop/brody push、目标 develop/master 的 PR 执行 `Basic quality`，包含文本编码、仓库文档检查、Node 测试和事件/版本门禁，不安装 Android 工具链、不构建 APK。所有 PR 均不运行重复 Debug/Release 打包；目标 master 的 PR 另须通过只读 `Release readiness`。这里的“不构建/不发行”不再表示“不运行基础验证”。
 
-只有 develop push 的第三位升版运行 `Development Debug`，APK 和必要检查成功后，独立最小写权限任务创建开发 Tag；不创建 Release、不传入正式签名 Secrets。手动入口默认只做基础验证；`repair_debug=true` 仅允许 develop，并必须填写原始升版前的 `base_sha`，固定事件 SHA。已有 Tag 指向不同 SHA 时停止，须准备新版本。
+develop push 的第三位和第四位升版均运行 `Development Debug`：第三位成功后按原规则创建开发 Tag；第四位仅产出测试包，不创建 Tag/Release、不传入正式签名 Secrets。手动入口默认只做基础验证；`repair_debug=true` 仅允许 develop，并必须填写原始升版前的 `base_sha`，固定事件 SHA。已有 Tag 指向不同 SHA 时停止，须准备新版本。
 
-brody 分支名必须与四段版本完全一致。push 按事件 before/after SHA 比较；首次建分支 before 为零或缺少可信基准时门禁失败，不能猜测，可以用明确源 SHA 的手动基础验证继续；该路径即使手动也不能打包/发行。Tag push 不触发这些工作流。正式发行仍只接受本仓库 develop → master 的已合并 PR 事件。
+第四位测试版统一使用 develop，不再为新测试版创建 brody 分支。已有 brody 分支保留历史基础检查入口、名称与四段版本匹配且不构建/发行，不自动迁移或删除。push 按事件 before/after SHA 比较；before 为零或缺少可信基准时失败，不猜测，可使用明确原始基准的手动入口。手动 Debug 修复允许第三位开发版及第四位测试版，均只在 develop 执行。Tag push 不触发这些工作流。正式发行仍只接受本仓库 develop → master 的已合并 PR 事件。
 
 ### 比较基准与合法性
 
@@ -30,19 +30,19 @@ brody 分支名必须与四段版本完全一致。push 按事件 before/after S
 - 版本回退、只改 versionCode、格式不合法或混合四段升版均不能当作新版本触发。仅第三位变化不因将来可能发行而提前合并 master；以后要正式发行，另行确认第一或第二位升版。
 - 开发 CI 是否启动依据版本变化，不能依赖最新正式 Tag：开发版本可能连续递增且尚无正式 Release。开发 Tag 在成功后才创建，所以失败时也不能把最新 Tag 当成上次推送版本。
 - 正式发行候选还须与本仓库已公开正式 Release 的最高数字版本比较，第一或第二位必须提高；所有现存 Tag 用于检查名称占用，不能把开发 Tag 当正式发行历史。历史三段补丁正式版保留，不追溯改变其性质。
-- 第四位分支不作为后续 develop 的隐式版本基准；如需集成其中代码，单独确认集成范围并按目标 develop 新版本重新检查。不得直接将 brody 分支合入 master 发行；临时分支不自动删除。
+- 第四位测试版是 develop 的正常版本基准，下一测试版提高第四位，下一三段版本须提高前三位中的适用部分并递增 versionCode；不得把去掉第四位当成合法升版。已有 brody 分支不得直接合入 master 发行，不自动删除。
 
 ### 开发 Tag、失败与重复事件
 
 - 开发 Tag 与正式 Tag 均用 `v` 加三段 versionName；开发 Tag 没有 Release。正式版本的身份还须核对已公开 Release、对应 Tag/SHA 及 develop → master 合并来源，不以 Tag 名字单独推断。
-- 开发流水线只在所有必要检查和 Debug 产物校验成功后创建指向本次源码完整 SHA 的 Tag；需要最小化的 Tag 写权限，不能因此授予开发构建正式签名凭据或发布权限。
+- 三段第三位开发流水线只在所有必要检查和 Debug 产物校验成功后创建指向本次源码完整 SHA 的 Tag；第四位测试路径不进入 Tag 写入任务。需要最小化的 Tag 写权限，不能因此授予开发构建正式签名凭据或发布权限。
 - 同名 Tag 指向相同 SHA 时核验后幂等结束；指向其他 SHA 时失败，不移动、不删除、不覆盖。普通同版本后续 push 不重复构建或创建 Tag。
 - 失败重跑固定原 SHA、版本和比较基准；源码修复产生新 SHA 后，未用版本可通过明确的修复验证入口重新检查，不能因“版本未变”静默跳过所需验证。若开发 Tag 已存在，修复代码必须准备新的第三位版本。正式发布失败恢复仍按下文执行。
 - 第一、二位升版跳过 develop push 的构建，也不运行重复的 master PR Debug/Release 构建；合并前仍保留来源、固定候选 SHA、版本、Tag 占用及签名配置的只读预检。正式构建、测试、lint、签名及包校验集中在合并后执行。合并后失败则停止发行并报告，不把合并成功当作发布成功。
 
 ### 尚待实现的适配
 
-本地已实现基础验证、版本分流、开发 Tag 幂等/冲突门禁、brody 隔离及固定基准手动修复，移除合并前重复 Release 构建；三/四段解析在 `scripts/version-policy.mjs`，CI 事件/开发 Tag 在 `scripts/ci.mjs`，正式发行门禁沿用 `scripts/release.mjs`。本地实现不等于远端部署或端到端验收。
+本地已实现基础验证、版本分流、开发 Tag 幂等/冲突门禁、第四位测试版 Debug 分流、历史 brody 隔离及固定基准手动修复，移除合并前重复 Release 构建；三/四段解析在 `scripts/version-policy.mjs`，CI 事件/开发 Tag 在 `scripts/ci.mjs`，正式发行门禁沿用 `scripts/release.mjs`。本地实现不等于远端部署或端到端验收。
 
 2026-11-07 只读预检：远端 master 仍要求 `build`、`Release readiness`、`Release build`，strict/enforce_admins 为 true；最高公开版本为 v0.1.2。待获准推送并验证新检查后，拟仅将 required_status_checks 调整为 GitHub Actions 的 `Basic quality` 和 `Release readiness`，保留严格同步、管理员约束及其他保护，不绕过当前门禁。正式工作流仍需获准合入 master 后生效。
 
@@ -57,8 +57,8 @@ brody 分支名必须与四段版本完全一致。push 按事件 before/after S
 ## 版本的唯一来源
 
 - EhReader 当前版本来源为 app/build.gradle.kts 中的 versionName 与 versionCode。后续若抽成单独配置，应只保留一个来源并同步脚本。
-- 开发构建和正式版 versionName 使用三段数字，Tag 固定为 v 加 versionName，例如 v0.1.3。四段版本仅用于 brody 临时保存，不属于正式版或自动预发布 Release。
-- versionCode 为正整数，独立于版本段数，不从第四位拼接或猜测。新发行必须严格大于本项目历史已公开发行的最大值；新开发安装包也须高于已分发的同 applicationId 开发包，避免无法升级。只保存的四段版本不要求生成新安装包编号；同一版本、同一 SHA 的失败重试不增加 versionCode。比较不能混入上游旧应用的版本序列。
+- 三段版本沿用开发/正式分流，第三位开发 Tag 固定为 v 加 versionName。四段 versionName 用于测试包，例如 1.8.15.1，不创建测试 Tag 或 Release；正式发行仍必须是三段。
+- versionCode 为正整数，独立于版本段数，不从第四位拼接或猜测。新发行必须严格大于本项目历史已公开发行的最大值；新开发安装包也须高于已分发的同 applicationId 开发包，避免无法升级。第四位测试版也必须递增安装编号，本次 1.8.15 / 10815 → 1.8.15.1 / 10816；后续继续独立递增，不将第四位直接拼接成编号；同一版本、同一 SHA 的失败重试不增加 versionCode。比较不能混入上游旧应用的版本序列。
 - 是否需要版本问答按[第 2 阶段默认策略](DEVELOPMENT_FLOW.md#版本准备第-2-阶段)处理：普通改动及必要编译不自动升版，交付测试包但未说明版本时先确认；发行或升版目标不能猜测。需要更新时先确认具体版本并修改配置，第 3 阶段检查最终状态，第 4 阶段用[最终审核单](DEVELOPMENT_FLOW.md#最终审核单)同时处理测试安排和提交推送权限，复用已有明确答复，不设置升版后的第二轮常规测试确认；第 5 阶段才提交。正式发行仍单独确认具体合并及版本。CI 从提交配置派生 Tag，不修改源码、不自动增加数字、不因重跑生成新版本。
 - 目标 master 的 PR 必须通过独立 `Release readiness` 只读检查：仅接受同仓库 develop，固定 PR head SHA，检查第一或第二位升版、未使用的 Tag、严格递增的版本和四项签名 Secrets 是否齐备。不创建 Tag/Release，不执行 Debug/Release 构建，也不代替合并后的正式门禁。
 - 完整格式/测试/lint/构建和实际 ABI 源码审计在合并后对固定 SHA 执行；此目标取代原合并前必需 `Release build`，实际迁移边界见上文。
@@ -67,7 +67,7 @@ brody 分支名必须与四段版本完全一致。push 按事件 before/after S
 
 ## CI/CD 必须执行的阶段
 
-1. 核对仓库、pull_request closed + merged=true 事件、head=develop、base=master 和来源仓库，固定实际合并 SHA；验证三段版本格式、第一或第二位升版、递增关系及 Tag 是否已被使用。第三位开发版本和四段保存版本不得正式发行。
+1. 核对仓库、pull_request closed + merged=true 事件、head=develop、base=master 和来源仓库，固定实际合并 SHA；验证三段版本格式、第一或第二位升版、递增关系及 Tag 是否已被使用。第三位开发版本和四段测试版本不得正式发行。
 2. 对该提交执行格式检查、Release lint、适用测试和正式构建。必须显式运行 lintRelease；assembleRelease 成功不等于 lint 成功。
 3. 使用受保护的正式签名凭据；与 v0.1.0 相同的 EhReader 独立签名证书保持更新兼容。凭据缺失、证书不符时失败，不回退到 debug 签名，不把 unsigned 当正式包。私钥及密码不进入仓库、日志、缓存或附件。
 4. 验证包名 com.haorengg12.ehreader、版本、ABI 清单、签名、对齐及来源 SHA。产物必须来自本次固定 SHA 的 CI 构建，不混入本地文件或其他运行附件。

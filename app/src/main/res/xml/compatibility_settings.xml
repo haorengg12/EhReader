@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (C) 2026 haorengg12. SPDX-License-Identifier: GPL-3.0-only -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <Preference
+        android:key="import_legacy_ehviewer"
+        android:persistent="false"
+        android:summary="@string/settings_compatibility_import_legacy_summary"
+        android:title="@string/settings_compatibility_import_legacy" />
+
+    <Preference
+        android:key="restore_legacy_downloads"
+        android:persistent="false"
+        android:summary="@string/settings_compatibility_restore_downloads_summary"
+        android:title="@string/settings_compatibility_restore_downloads" />
+
+</PreferenceScreen>

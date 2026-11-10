@@ -1,7 +1,7 @@
 // Copyright (C) 2026 haorengg12. SPDX-License-Identifier: GPL-3.0-only
 import assert from 'node:assert/strict';
 
-/** 唯一版本来源；第四位只用于 brody 保存，不把版本数字猜测为 versionCode。 */
+/** 唯一版本来源；第四位用于测试包，不把版本数字猜测为 versionCode。 */
 export function parseAppVersion(source) {
     const names = [...source.matchAll(/^\s*versionName\s*=\s*"([^"\n]+)"\s*$/gm)];
     const codes = [...source.matchAll(/^\s*versionCode\s*=\s*(\d+)\s*$/gm)];
@@ -31,7 +31,7 @@ function isVersionAlignment(previous, current) {
     return previous.name === '0.1.2' && previous.code === 102 && current.name === '1.8.15' && current.code > previous.code;
 }
 
-/** 返回 save / development / official / snapshot；非法变化失败，不能静默跳过。 */
+/** 返回 save / development / official / testing；非法变化失败，不能静默跳过。 */
 export function versionPath(previous, current) {
     const before = previous.name.split('.').map(Number);
     const after = current.name.split('.').map(Number);
@@ -42,9 +42,9 @@ export function versionPath(previous, current) {
     assert(compareVersions(current.name, previous.name) > 0, 'Version downgrade or equivalent spelling is forbidden');
     const index = after.findIndex((value, i) => value !== (before[i] ?? 0));
     if (after.length === 4) {
-        assert(index === 3 && after.slice(0, 3).every((value, i) => value === before[i]), 'Snapshot must change only the fourth component');
-        assert(current.code >= previous.code, 'Snapshot versionCode cannot decrease');
-        return 'snapshot';
+        assert(index === 3 && after.slice(0, 3).every((value, i) => value === before[i]), 'Testing version must change only the fourth component');
+        assert(current.code > previous.code, 'Testing package versionCode must increase');
+        return 'testing';
     }
     assert(current.code > previous.code, 'New package versionCode must increase');
     if (index === 0 || index === 1) {

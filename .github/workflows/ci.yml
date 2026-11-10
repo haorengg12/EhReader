@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       repair_debug:
-        description: Revalidate a failed development version at this develop SHA
+        description: Revalidate a failed development or testing version at this develop SHA
         type: boolean
         default: false
       base_sha:
@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       debug: ${{ steps.route.outputs.debug }}
+      path: ${{ steps.route.outputs.path }}
       version: ${{ steps.route.outputs.version }}
       sha: ${{ steps.route.outputs.sha }}
       base: ${{ steps.route.outputs.base }}
@@ -106,6 +107,7 @@ jobs:
     if: >-
       needs.quality.result == 'success' && needs.debug.result == 'success' &&
       needs.quality.outputs.debug == 'true' &&
+      needs.quality.outputs.path == 'development' &&
       github.repository == 'haorengg12/EhReader' && github.ref == 'refs/heads/develop' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest

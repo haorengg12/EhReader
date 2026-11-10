@@ -534,7 +534,7 @@
     <string name="settings_advanced_export_data_summary">备份元数据、下载、历史、收藏、书签、规则、位置和阅读进度，不包含图片、设置及目录授权。</string>
     <string name="settings_advanced_export_data_to">已导出数据至 %s</string>
     <string name="settings_advanced_export_data_failed">导出数据失败</string>
-    <string name="settings_advanced_import_data">还原EhReader备份</string>
+    <string name="settings_advanced_import_data">导入数据</string>
     <string name="settings_advanced_import_data_summary">合并新版数据库备份，包含元数据和阅读进度。请先暂停下载，再选择下载根目录并重新关联文件；此入口不接收旧版EhViewer数据库。</string>
     <string name="settings_advanced_import_data_successfully">导入数据成功</string>
     <string name="settings_advanced_import_data_cant_read">无法还原。请先暂停下载并选择新版EhReader数据库备份；此入口不支持旧版EhViewer数据库。</string>
@@ -641,4 +641,10 @@
     <string name="gallery_detail_local_error">正在显示本地保存的画廊信息。%1$s</string>
     <string name="gallery_detail_not_saved">未保存</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5（评分人数未保存）</string>
+    <string name="settings_compatibility">兼容性</string>
+    <string name="settings_compatibility_import_legacy">导入旧版本EhViewer数据</string>
+    <string name="settings_compatibility_import_legacy_summary">导入旧版本 EhViewer 的数据，暂未开放。</string>
+    <string name="settings_compatibility_restore_downloads">恢复下载项（旧版本）</string>
+    <string name="settings_compatibility_restore_downloads_summary">迁移旧版本下载目录中的本地文件，暂未开放。</string>
+    <string name="settings_compatibility_unavailable">此功能暂未开放</string>
 </resources>

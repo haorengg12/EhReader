@@ -12,6 +12,7 @@
 - 每次数据库表关系或结构改变，按[数据库文档同步规则](.agents/docs/CODING_STANDARDS.md#数据库文档同步)在同一次修改中更新相关文档与 schema。
 - 工作区目录按[本地开发规范](.agents/docs/LOCAL_DEVELOPMENT.md#工作区目录约定)管理：规范在仓库内 `.agents/docs`，本地 arm64-v8a 产物放工作区 `release`，临时文件放 `temp`，废弃文件或目录回收到 `trash`；两个根目录 AGENTS.md 保留为入口。临时日志、排查记录等按[临时文件规则](.agents/docs/DEVELOPMENT_FLOW.md#临时文件存放)管理。
 - 版本默认策略、审核单和失败恢复按[开发流程](.agents/docs/DEVELOPMENT_FLOW.md)；每次代码修改完成并通过必要检查后，按[本地提交约定](.agents/docs/REPOSITORY_WORKFLOW.md#本地代码提交约定2026-11-10)在 develop 做一次本地 Git 提交，不创建 Tag、不自动推送。上传和 master 合并仍需相应授权；实质变更重新核验受影响结果，不沿用旧包验收、不强推。
+- 第四位版本号用于测试版（如 1.8.15.1），继续使用 develop，可按要求打 Debug 包；不创建测试 Tag 或 Release。
 - 版本算法、基础验证/打包分流及部署状态只在[发布规范](.agents/docs/RELEASE_POLICY.md)维护。master 合并始终另需确认具体提交及版本；仅本仓库 develop → master 的已合并 PR 事件可正式发行。
 - 版本、签名或发布条件不满足时失败停止；不得用调试签名冒充正式包，不改写既有 Tag。
 - 保留 GPL、上游版权和 Git 历史。旧仓库 haorengg12/EhViewer 不在写入范围。

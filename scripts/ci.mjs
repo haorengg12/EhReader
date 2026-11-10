@@ -30,7 +30,7 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
     const ref = event.ref;
     assert(ref === 'refs/heads/develop' || ref?.startsWith('refs/heads/brody-'), 'Only develop and brody branches may use this entry');
     const development = ref === 'refs/heads/develop';
-    assert.equal(current.name.split('.').length, development ? 3 : 4, 'Version shape does not match branch');
+    if (!development) assert.equal(current.name.split('.').length, 4, 'Version shape does not match branch');
     if (!development) assert.equal(ref, `refs/heads/brody-${current.name}`, 'Snapshot branch/version mismatch');
     if (eventName === 'push') {
         assert(!event.deleted, 'Deleted branches cannot build');
@@ -46,13 +46,16 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
     }
     assert(isAncestor(result.base, sha), 'Base SHA must be an ancestor of checked source');
     const previous = parseAppVersion(readVersion(result.base));
-    if (development) assert.equal(previous.name.split('.').length, 3, 'develop base cannot be a snapshot');
     result.path = versionPath(previous, current);
-    assert(development ? result.path !== 'snapshot' : ['snapshot', 'save'].includes(result.path), 'Version path does not match branch');
-    result.debug = development && result.path === 'development';
+    if (!development) {
+        assert(['testing', 'save'].includes(result.path), 'Version path does not match branch');
+        // 历史 brody 分支继续只读基础检查，新测试版在 develop 构建。
+        if (result.path === 'testing') result.path = 'snapshot';
+    }
+    result.debug = development && ['development', 'testing'].includes(result.path);
     if (eventName === 'workflow_dispatch') {
         const repair = event.inputs?.repair_debug === true || event.inputs?.repair_debug === 'true';
-        if (repair) assert.equal(result.path, 'development', 'Repair must use the original pre-version-change base');
+        if (repair) assert(['development', 'testing'].includes(result.path), 'Repair must use the original pre-version-change base');
         result.debug = repair;
     }
     return result;
@@ -98,7 +101,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const action = process.argv[2];
     const plan = fromEnvironment();
     if (action === 'plan') {
-        if (plan.debug) {
+        if (plan.debug && plan.path === 'development') {
             const target = remoteTag(plan.tag);
             assert(!target || target === plan.sha, 'Existing development tag requires a new version for repaired source');
         }

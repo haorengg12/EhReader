@@ -26,8 +26,8 @@ test('三/四段严格版本、整数比较和所有合法分流', () => {
     assert.equal(versionPath(version('0.1.2'), version('0.1.3', 103)), 'development');
     assert.equal(versionPath(version('0.1.2'), version('0.2.0', 103)), 'official');
     assert.equal(versionPath(version('0.1.2'), version('1.0.0', 103)), 'official');
-    assert.equal(versionPath(version('0.1.2'), version('0.1.2.12')), 'snapshot');
-    assert.equal(versionPath(version('0.1.2.12'), version('0.1.2.20')), 'snapshot');
+    assert.equal(versionPath(version('0.1.2'), version('0.1.2.12', 103)), 'testing');
+    assert.equal(versionPath(version('0.1.2.12', 103), version('0.1.2.20', 104)), 'testing');
     assert.equal(compareVersions('0.1.10', '0.1.9'), 1);
     assert.equal(compareVersions('0.1.2', '0.1.2.0'), 0);
     for (const name of ['0.1.2.0', '0.1.2.01', '01.1.2', '0.1', '0.1.2-beta', '0.1.2.1.1', '9007199254740992.0.0']) assert.throws(() => version(name));
@@ -39,7 +39,7 @@ test('降版、混合四段、未清零、仅 versionCode 变化及非递增安�
     }
     assert.throws(() => versionPath(version('0.1.2'), version('0.1.2', 103)), /only versionCode/);
     assert.throws(() => versionPath(version('0.1.2'), version('0.1.3')), /versionCode must increase/);
-    assert.throws(() => versionPath(version('0.1.2'), version('0.1.2.1', 101)), /cannot decrease/);
+    assert.throws(() => versionPath(version('0.1.2'), version('0.1.2.1', 101)), /versionCode must increase/);
 });
 
 test('用户指定 0.1.2 → 1.8.15 对齐走正式发行，例外不扩展到其他来源或目标', () => {
@@ -55,7 +55,7 @@ test('用户指定 0.1.2 → 1.8.15 对齐走正式发行，例外不扩展到�
     assert.throws(() => versionPath(version('0.1.2', 102), version('1.8.15', 102)), /versionCode must increase/);
 });
 
-test('develop 不升版和第一/二位升版仅基础验证；只有第三位变化打 Debug', () => {
+test('develop 不升版和第一/二位升版仅基础验证；第三位和第四位变化打 Debug', () => {
     assert.equal(plan(push()).debug, true);
     assert.equal(plan(push()).base, before);
     assert.equal(plan(push(), '0.1.2', '0.1.2', 'push', 102, 102).debug, false);
@@ -64,15 +64,15 @@ test('develop 不升版和第一/二位升版仅基础验证；只有第三位�
         assert.equal(result.path, 'official');
         assert.equal(result.debug, false);
     }
-    assert.throws(() => plan(push(), '0.1.2', '0.1.2.1'), /Version shape/);
+    assert.equal(plan(push(), '0.1.2', '0.1.2.1').debug, true);
 });
 
 test('brody 保存运行基础验证但不打包，分支版本和比较基准必须匹配', () => {
-    const result = plan(push('refs/heads/brody-0.1.2.12'), '0.1.2', '0.1.2.12', 'push', 102, 102);
+    const result = plan(push('refs/heads/brody-0.1.2.12'), '0.1.2', '0.1.2.12', 'push', 102, 103);
     assert.equal(result.path, 'snapshot');
     assert.equal(result.debug, false);
     assert.throws(() => plan(push('refs/heads/brody-0.1.2.2'), '0.1.2', '0.1.2.12'), /mismatch/);
-    assert.throws(() => plan(push('refs/heads/brody-0.1.3.1'), '0.1.2', '0.1.3.1'), /Snapshot/);
+    assert.throws(() => plan(push('refs/heads/brody-0.1.3.1'), '0.1.2', '0.1.3.1'), /Testing version/);
 });
 
 test('所有 PR 只读基础验证，按 PR head 而非合并引用检查', () => {
@@ -131,7 +131,7 @@ test('正式版本按最高公开正式版本数值比较，开发 Tag 不属于
     assert.throws(() => validateOfficialVersion(version('0.1.9.1', 110), history), /three components/);
 });
 
-test('真实 CLI 从固定 Git before/after 读取版本，基础验证不打包、不写 Tag', t => {
+test('真实 CLI 从固定 Git before/after 识别四段测试版，不查询远端 Tag 或写入仓库', t => {
     const base = path.resolve(process.env.EHREADER_TEST_TEMP || tmpdir());
     const repo = mkdtempSync(path.join(base, 'ci-plan-'));
     t.after(() => {
@@ -146,7 +146,7 @@ test('真实 CLI 从固定 Git before/after 读取版本，基础验证不打包
     git('add', '.');
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'base');
     const baseSha = git('rev-parse', 'HEAD');
-    writeFileSync(path.join(repo, 'app/build.gradle.kts'), source('0.2.0', 103));
+    writeFileSync(path.join(repo, 'app/build.gradle.kts'), source('0.1.2.1', 103));
     git('add', '.');
     git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'candidate');
     const headSha = git('rev-parse', 'HEAD');
@@ -157,8 +157,27 @@ test('真实 CLI 从固定 Git before/after 读取版本，基础验证不打包
         ...process.env, GITHUB_EVENT_PATH: eventFile, GITHUB_EVENT_NAME: 'push', GITHUB_REPOSITORY: REPOSITORY,
         GITHUB_REF: 'refs/heads/develop', GITHUB_SHA: headSha, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: path.join(repo, 'summary.md'),
     } });
-    assert.match(readFileSync(output, 'utf8'), /path=official\ndebug=false/);
+    assert.match(readFileSync(output, 'utf8'), /path=testing\ndebug=true/);
     assert.match(readFileSync(output, 'utf8'), new RegExp(`base=${baseSha}`));
     assert.equal(git('tag', '--list'), '');
     assert.equal(git('rev-parse', 'HEAD'), headSha);
+});
+
+test('四段测试版在 develop 递增安装编号、可修复打包，不能创建开发 Tag 或正式发行', async () => {
+    const first = plan(push(), '1.8.15', '1.8.15.1', 'push', 10815, 10816);
+    assert.equal(first.path, 'testing');
+    assert.equal(first.debug, true);
+    const workflow = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+    assert.match(workflow.split('  development-tag:')[1], /needs\.quality\.outputs\.path == 'development'/);
+    assert.equal(plan(push(), '1.8.15.1', '1.8.15.2', 'push', 10816, 10817).debug, true);
+    assert.equal(plan(push(), '1.8.15.1', '1.8.15.1', 'push', 10816, 10816).debug, false);
+    assert.throws(() => plan(push(), '1.8.15', '1.8.15.1', 'push', 10815, 10815), /versionCode must increase/);
+    const manual = { ...push(), inputs: { repair_debug: 'true', base_sha: before } };
+    assert.equal(plan(manual, '1.8.15', '1.8.15.1', 'workflow_dispatch', 10815, 10816).debug, true);
+    await assert.rejects(ensureDevelopmentTag({ plan: first,
+        findTag: () => assert.fail('Testing must not read tag refs'),
+        createTag: () => assert.fail('Testing must not create a tag'),
+    }));
+    assert.throws(() => validateOfficialVersion(version('1.8.15.1', 10816), []), /three components/);
+    assert.equal(plan(push(), '1.8.15.1', '1.8.16', 'push', 10816, 10817).path, 'development');
 });
