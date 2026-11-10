@@ -932,18 +932,15 @@ class DownloadsScene :
             val checked = mBuilder.isChecked
             Settings.putRemoveImageFiles(checked)
             if (checked) {
-                val files = arrayOfNulls<UniFile>(mDownloadInfoList.size)
-                for ((i, info) in mDownloadInfoList.withIndex()) {
-                    // Put file
-                    files[i] = SpiderDen.getGalleryDownloadDir(info.gid)
-                    // DB Actions
-                    DownloadManager.removeDownloadDirname(info.gid)
-                }
-                // Other Actions
                 lifecycleScope.launchIO {
-                    runCatching {
-                        files.forEach { it?.delete() }
+                    var allDeleted = true
+                    mDownloadInfoList.forEach { info ->
+                        val removed = runCatching { com.hippo.ehviewer.download.DownloadStorage.deleteFiles(info.gid) }
+                            .onFailure { android.util.Log.e("DownloadsScene", "Cannot delete gallery files", it) }
+                            .getOrDefault(false)
+                        if (!removed) allDeleted = false
                     }
+                    if (!allDeleted) com.hippo.util.withUIContext { showTip(R.string.error_write_failed, LENGTH_LONG) }
                 }
             }
         }

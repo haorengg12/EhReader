@@ -57,7 +57,7 @@
     <string name="clipboard_gallery_url_snack_action">查看</string>
     <string name="please_wait">請稍候…</string>
     <string name="app_link_not_verified_title">應用鏈接未驗證</string>
-    <string name="app_link_not_verified_message">對於 Android 12 及更高版本，您需要手動添加鏈接到已驗證鏈接才能在 EhViewer 中打開 E-Hentai 鏈接。</string>
+    <string name="app_link_not_verified_message">對於 Android 12 及更高版本，您需要手動添加鏈接到已驗證鏈接才能在 EhReader 中打開 E-Hentai 鏈接。</string>
     <string name="open_settings">打開設置</string>
     <string name="dont_show_again">不再顯示</string>
 
@@ -368,7 +368,7 @@
     <string name="default_download_label">默認下載標籤</string>
     <!-- Download Service -->
     <string name="download_service">下載服務</string>
-    <string name="download_service_label">EhViewer 下載服務</string>
+    <string name="download_service_label">EhReader 下載服務</string>
     <string name="download_speed_text_2">%1$s，剩餘 %2$s</string>
     <string name="stat_download_action_stop_all">全部停止</string>
     <string name="stat_509_alert_title">509 警告</string>
@@ -636,4 +636,7 @@
     <plurals name="year">
         <item quantity="other">年</item>
     </plurals>
+    <string name="gallery_detail_local_error">正在顯示本機儲存的畫廊資訊。%1$s</string>
+    <string name="gallery_detail_not_saved">未儲存</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5（評分人數未儲存）</string>
 </resources>

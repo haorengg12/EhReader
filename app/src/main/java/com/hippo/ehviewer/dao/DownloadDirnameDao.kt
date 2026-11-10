@@ -24,7 +24,7 @@ import androidx.room.Update
 
 @Dao
 interface DownloadDirnameDao : BasicDao<DownloadDirname> {
-    @Query("SELECT * FROM DOWNLOAD_DIRNAME WHERE GID = :gid")
+    @Query("SELECT * FROM DOWNLOAD_LOCATIONS WHERE GID = :gid")
     fun load(gid: Long): DownloadDirname?
 
     @Update
@@ -33,12 +33,12 @@ interface DownloadDirnameDao : BasicDao<DownloadDirname> {
     @Insert
     override fun insert(t: DownloadDirname): Long
 
-    @Query("DELETE FROM DOWNLOAD_DIRNAME WHERE GID = :gid")
+    @Query("DELETE FROM DOWNLOAD_LOCATIONS WHERE GID = :gid")
     fun deleteByKey(gid: Long)
 
-    @Query("DELETE FROM DOWNLOAD_DIRNAME")
+    @Query("DELETE FROM DOWNLOAD_LOCATIONS")
     fun deleteAll()
 
-    @Query("SELECT * FROM DOWNLOAD_DIRNAME")
+    @Query("SELECT * FROM DOWNLOAD_LOCATIONS")
     override fun list(): List<DownloadDirname>
 }

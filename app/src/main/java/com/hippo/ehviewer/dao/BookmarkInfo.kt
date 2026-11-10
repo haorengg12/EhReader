@@ -19,11 +19,9 @@ package com.hippo.ehviewer.dao
 
 import android.annotation.SuppressLint
 import androidx.room.ColumnInfo
-import androidx.room.Entity
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
 
 @SuppressLint("ParcelCreator")
-@Entity(tableName = "BOOKMARKS")
 class BookmarkInfo : BaseGalleryInfo() {
     @ColumnInfo(name = "PAGE")
     var page = 0

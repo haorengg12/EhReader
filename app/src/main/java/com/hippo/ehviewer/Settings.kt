@@ -594,6 +594,9 @@ object Settings {
         else -> false
     }
 
+    val saveAsCbz: Boolean
+        get() = getBoolean("save_as_cbz", true)
+
     val skipCopyImage: Boolean
         get() = getIntFromStr(KEY_DOWNLOAD_ORIGIN_IMAGE, DEFAULT_DOWNLOAD_ORIGIN_IMAGE) == 2
 

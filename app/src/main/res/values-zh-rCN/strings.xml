@@ -57,7 +57,7 @@
     <string name="clipboard_gallery_url_snack_action">查看</string>
     <string name="please_wait">请稍候…</string>
     <string name="app_link_not_verified_title">应用链接未验证</string>
-    <string name="app_link_not_verified_message">对于 Android 12 及更高版本，您需要手动添加链接到已验证链接才能在 EhViewer 中打开 E-Hentai 链接。</string>
+    <string name="app_link_not_verified_message">对于 Android 12 及更高版本，您需要手动添加链接到已验证链接才能在 EhReader 中打开 E-Hentai 链接。</string>
     <string name="open_settings">打开设置</string>
     <string name="dont_show_again">不再显示</string>
 
@@ -368,7 +368,7 @@
     <string name="default_download_label">默认下载标签</string>
     <!-- Download Service -->
     <string name="download_service">下载服务</string>
-    <string name="download_service_label">EhViewer 下载服务</string>
+    <string name="download_service_label">EhReader 下载服务</string>
     <string name="download_speed_text_2">%1$s，剩余 %2$s</string>
     <string name="stat_download_action_stop_all">全部停止</string>
     <string name="stat_509_alert_title">509 警告</string>
@@ -494,13 +494,13 @@
     <string name="settings_download_download_origin_image_force">总是启用</string>
     <string name="settings_download_download_origin_image_only">仅下载时启用</string>
     <string name="settings_download_task_confirm">确定要执行操作？</string>
-    <string name="settings_download_restore_download_items">恢复下载项</string>
-    <string name="settings_download_restore_download_items_summary">恢复下载目录里的所有下载项</string>
+    <string name="settings_download_restore_download_items">重新关联下载文件</string>
+    <string name="settings_download_restore_download_items_summary">核验已登记下载在所选根目录下的文件。缺少记录时请先还原新版数据库备份；不扫描或修改未知目录。</string>
     <string name="settings_download_restore_not_found">未找到可恢复下载项</string>
     <string name="settings_download_restore_failed">恢复失败</string>
     <string name="settings_download_restore_successfully">成功恢复 %d 项</string>
     <string name="settings_download_clean_redundancy">清理下载冗余</string>
-    <string name="settings_download_clean_redundancy_summary">清理下载目录中不在下载列表里的图片文件</string>
+    <string name="settings_download_clean_redundancy_summary">仅清理已登记但已移除下载记录的文件，不处理未知目录。</string>
     <string name="settings_download_clean_redundancy_no_redundancy">未发现冗余</string>
     <string name="settings_download_clean_redundancy_done">完成冗余清理，共清理 %d 项</string>
     <string name="settings_privacy">隐私</string>
@@ -531,13 +531,13 @@
     <string name="settings_advanced_backup_favorite_success">备份收藏列表成功</string>
     <string name="settings_advanced_backup_favorite_failed">备份收藏列表失败</string>
     <string name="settings_advanced_export_data">导出数据</string>
-    <string name="settings_advanced_export_data_summary">保存数据至外置存储器，例如下载列表，快速搜索列表</string>
+    <string name="settings_advanced_export_data_summary">备份元数据、下载、历史、收藏、书签、规则、位置和阅读进度，不包含图片、设置及目录授权。</string>
     <string name="settings_advanced_export_data_to">已导出数据至 %s</string>
     <string name="settings_advanced_export_data_failed">导出数据失败</string>
-    <string name="settings_advanced_import_data">导入数据</string>
-    <string name="settings_advanced_import_data_summary">从外置存储器导入数据</string>
+    <string name="settings_advanced_import_data">还原EhReader备份</string>
+    <string name="settings_advanced_import_data_summary">合并新版数据库备份，包含元数据和阅读进度。请先暂停下载，再选择下载根目录并重新关联文件；此入口不接收旧版EhViewer数据库。</string>
     <string name="settings_advanced_import_data_successfully">导入数据成功</string>
-    <string name="settings_advanced_import_data_cant_read">无法读取文件</string>
+    <string name="settings_advanced_import_data_cant_read">无法还原。请先暂停下载并选择新版EhReader数据库备份；此入口不支持旧版EhViewer数据库。</string>
     <string name="settings_advanced_open_by_default">默认打开</string>
     <string name="settings_about">关于</string>
     <string name="settings_about_declaration_summary">EhReader 与 E-Hentai.org 无任何联系</string>
@@ -636,4 +636,9 @@
     <plurals name="year">
         <item quantity="other">年</item>
     </plurals>
+    <string name="settings_download_save_as_cbz">保存为CBZ压缩包</string>
+    <string name="settings_download_save_as_cbz_summary">仅对新下载生效，关闭后保存编号散图。</string>
+    <string name="gallery_detail_local_error">正在显示本地保存的画廊信息。%1$s</string>
+    <string name="gallery_detail_not_saved">未保存</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5（评分人数未保存）</string>
 </resources>

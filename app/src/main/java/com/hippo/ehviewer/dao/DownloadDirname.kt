@@ -19,9 +19,10 @@ package com.hippo.ehviewer.dao
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "DOWNLOAD_DIRNAME")
+@Entity(tableName = "DOWNLOAD_LOCATIONS", foreignKeys = [ForeignKey(entity = GalleryMetadata::class, parentColumns = ["GID"], childColumns = ["GID"], onDelete = ForeignKey.RESTRICT)])
 data class DownloadDirname(
     @PrimaryKey
     @ColumnInfo(name = "GID")
@@ -29,4 +30,12 @@ data class DownloadDirname(
 
     @ColumnInfo(name = "DIRNAME")
     var dirname: String? = null,
+    @ColumnInfo(name = "ROOT_URI") var rootUri: String? = null,
+    @ColumnInfo(name = "ACTUAL_PATH") var actualPath: String? = null,
+    @ColumnInfo(name = "TEMP_PATH") var tempPath: String? = null,
+    @ColumnInfo(name = "FORMAT") var format: String = "cbz",
+    @ColumnInfo(name = "PHASE") var phase: String = "pending",
+    @ColumnInfo(name = "EXPECTED_PAGES") var expectedPages: Int = 0,
+    @ColumnInfo(name = "LAST_ERROR") var lastError: String? = null,
+    @ColumnInfo(name = "MANIFEST") var manifest: String? = null,
 )

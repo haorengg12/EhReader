@@ -18,16 +18,19 @@
 package com.hippo.ehviewer.dao
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [BookmarkInfo::class, DownloadInfo::class, DownloadLabel::class, DownloadDirname::class, Filter::class, HistoryInfo::class, LocalFavoriteInfo::class, QuickSearch::class],
-    version = 4,
-    exportSchema = false,
+    entities = [GalleryMetadata::class, ReadingState::class, BookmarkRecord::class, DownloadRecord::class, DownloadLabel::class, DownloadDirname::class, Filter::class, HistoryRecord::class, LocalFavoriteRecord::class, QuickSearch::class],
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    exportSchema = true,
 )
 abstract class EhDatabase : RoomDatabase() {
+    abstract fun galleryMetadataDao(): GalleryMetadataDao
     abstract fun bookmarksBao(): BookmarksDao
     abstract fun downloadDirnameDao(): DownloadDirnameDao
     abstract fun downloadLabelDao(): DownloadLabelDao
@@ -39,7 +42,8 @@ abstract class EhDatabase : RoomDatabase() {
 }
 
 fun buildMainDB(context: Context): EhDatabase {
+    // 独立新库不打开、不迁移、不改写 eh.db 及其 WAL；旧版本来源留待手动导入。
     // TODO: Remove allowMainThreadQueries
-    return Room.databaseBuilder(context, EhDatabase::class.java, "eh.db").allowMainThreadQueries()
+    return Room.databaseBuilder(context, EhDatabase::class.java, "ehreader.db").allowMainThreadQueries()
         .build()
 }

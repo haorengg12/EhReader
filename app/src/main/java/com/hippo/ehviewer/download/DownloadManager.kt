@@ -49,9 +49,6 @@ object DownloadManager : OnSpiderListener {
     // label and info list map, without default label info list
     private val mMap: MutableMap<String?, LinkedList<DownloadInfo>>
 
-    // All download dirname
-    private val mAllDownloadDirname = mutableMapOf<Long, String>()
-
     // All labels without default label
     private val mLabelList: MutableList<DownloadLabel>
 
@@ -64,18 +61,13 @@ object DownloadManager : OnSpiderListener {
     private val mDownloadInfoListeners: MutableList<DownloadInfoListener?>
     private val mNotifyTaskPool = ConcurrentPool<NotifyTask?>(5)
     private var mDownloadListener: DownloadListener? = null
+
+    @Volatile
+    private var mTaskGeneration = 0
     private var mCurrentTask: DownloadInfo? = null
     private var mCurrentSpider: SpiderQueen? = null
 
     init {
-        // Get all download dirname
-        val allDownloadDirname = EhDB.allDownloadDirname
-        for ((gid, dirname) in allDownloadDirname) {
-            if (dirname != null) {
-                mAllDownloadDirname.put(gid, dirname)
-            }
-        }
-
         // Get all labels
         val labels = EhDB.allDownloadLabelList.toMutableList()
         mLabelList = labels
@@ -120,18 +112,43 @@ object DownloadManager : OnSpiderListener {
         mWaitList = LinkedList()
         mSpeedReminder = SpeedReminder()
         mDownloadInfoListeners = ArrayList()
+        EhDB.onGalleryMetadataChanged = { metadata ->
+            SimpleHandler.getInstance().post {
+                mAllInfoMap[metadata.gid]?.let { info ->
+                    info.token = metadata.token
+                    info.title = metadata.title
+                    info.titleJpn = metadata.titleJpn
+                    info.thumb = metadata.thumb
+                    info.category = metadata.category ?: 0
+                    info.posted = metadata.posted
+                    info.uploader = metadata.uploader
+                    info.rating = metadata.rating ?: Float.NaN
+                    info.simpleLanguage = metadata.simpleLanguage
+                    getInfoListForLabel(info.label)?.let { list -> mDownloadInfoListeners.forEach { it?.onUpdate(info, list) } }
+                }
+            }
+        }
     }
 
-    fun getDownloadDirname(gid: Long): String? = mAllDownloadDirname[gid]
+    fun hasActiveDownloads(): Boolean = mCurrentTask != null || mWaitList.isNotEmpty()
 
-    fun putDownloadDirname(gid: Long, dirname: String) {
-        mAllDownloadDirname.put(gid, dirname)
-        EhDB.putDownloadDirname(gid, dirname)
-    }
-
-    fun removeDownloadDirname(gid: Long) {
-        mAllDownloadDirname.remove(gid)
-        EhDB.removeDownloadDirname(gid)
+    /** 备份事务完成后重建展示索引，不自动加入运行队列。 */
+    fun reloadFromDatabase() {
+        check(!hasActiveDownloads())
+        mLabelList.clear()
+        mLabelList.addAll(EhDB.allDownloadLabelList)
+        mMap.clear()
+        mLabelList.forEach { mMap[it.label] = LinkedList() }
+        mDefaultInfoList.clear()
+        mAllInfoList.clear()
+        mAllInfoMap.clear()
+        EhDB.allDownloadInfo.forEach { info ->
+            mAllInfoList.add(info)
+            mAllInfoMap.put(info.gid, info)
+            val list = if (info.label == null) mDefaultInfoList else mMap.getOrPut(info.label) { LinkedList() }
+            list.add(info)
+        }
+        mDownloadInfoListeners.forEach { it?.onReload() }
     }
 
     private fun getInfoListForLabel(label: String?): LinkedList<DownloadInfo>? = if (label == null) {
@@ -191,6 +208,7 @@ object DownloadManager : OnSpiderListener {
         // Get download from wait list
         if (!mWaitList.isEmpty()) {
             val info = mWaitList.removeFirst()
+            mTaskGeneration++
             val spider = SpiderQueen.obtainSpiderQueen(info, SpiderQueen.MODE_DOWNLOAD)
             mCurrentTask = info
             mCurrentSpider = spider
@@ -221,6 +239,7 @@ object DownloadManager : OnSpiderListener {
     }
 
     fun startDownload(galleryInfo: GalleryInfo, label: String?) {
+        EhDB.putGalleryMetadata(galleryInfo)
         if (mCurrentTask != null && mCurrentTask!!.gid == galleryInfo.gid) {
             // It is current task
             return
@@ -595,11 +614,7 @@ object DownloadManager : OnSpiderListener {
     }
 
     private fun resetReadingProgress(gid: Long) {
-        val downloadDir = SpiderDen.getGalleryDownloadDir(gid) ?: return
-        val file = downloadDir.findFile(SpiderQueen.SPIDER_INFO_FILENAME) ?: return
-        val spiderInfo = readFromUniFile(file) ?: return
-        spiderInfo.startPage = 0
-        spiderInfo.saveToUniFile(file)
+        EhDB.putReadingState(gid, page = 0)
     }
 
     // Update in DB
@@ -637,6 +652,7 @@ object DownloadManager : OnSpiderListener {
             spider.removeOnSpiderListener(this@DownloadManager)
             SpiderQueen.releaseSpiderQueen(spider, SpiderQueen.MODE_DOWNLOAD)
         }
+        mTaskGeneration++
         mCurrentTask = null
         mCurrentSpider = null
         // Stop speed reminder
@@ -818,6 +834,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnGetPagesData(pages)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -827,6 +844,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnGet509Data(index)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -841,6 +859,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnPageDownloadData(index, contentLength, receivedSize, bytesRead)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -850,6 +869,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnPageSuccessData(index, finished, downloaded, total)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -865,6 +885,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnPageFailureDate(index, error, finished, downloaded, total)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -874,6 +895,7 @@ object DownloadManager : OnSpiderListener {
             task = NotifyTask()
         }
         task.setOnFinishDate(finished, downloaded, total)
+        task.generation = mTaskGeneration
         SimpleHandler.getInstance().post(task)
     }
 
@@ -956,6 +978,7 @@ object DownloadManager : OnSpiderListener {
     }
 
     private class NotifyTask : Runnable {
+        var generation = 0
         private var mType = 0
         private var mPages = 0
         private var mIndex = 0
@@ -1020,6 +1043,10 @@ object DownloadManager : OnSpiderListener {
         }
 
         override fun run() {
+            if (generation != mTaskGeneration) {
+                mNotifyTaskPool.push(this)
+                return
+            }
             when (mType) {
                 TYPE_ON_GET_PAGES -> {
                     val info = mCurrentTask
@@ -1055,6 +1082,7 @@ object DownloadManager : OnSpiderListener {
                         info.finished = mFinished
                         info.downloaded = mDownloaded
                         info.total = mTotal
+                        EhDB.putDownloadInfo(info)
                         if (mDownloadListener != null) {
                             mDownloadListener!!.onGetPage(info)
                         }
@@ -1075,6 +1103,7 @@ object DownloadManager : OnSpiderListener {
                         info.finished = mFinished
                         info.downloaded = mDownloaded
                         info.total = mTotal
+                        EhDB.putDownloadInfo(info)
                         val list: List<DownloadInfo>? = getInfoListForLabel(info.label)
                         if (list != null) {
                             for (l in mDownloadInfoListeners) {

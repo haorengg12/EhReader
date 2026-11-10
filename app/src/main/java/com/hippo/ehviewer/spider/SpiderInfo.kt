@@ -18,6 +18,7 @@ package com.hippo.ehviewer.spider
 import android.util.Log
 import coil3.disk.DiskCache
 import com.hippo.ehviewer.EhApplication
+import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.coil.edit
 import com.hippo.unifile.UniFile
 import com.hippo.unifile.openInputStream
@@ -25,6 +26,7 @@ import com.hippo.unifile.openOutputStream
 import com.hippo.util.runSuspendCatching
 import com.hippo.yorozuya.NumberUtils
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -37,7 +39,7 @@ class SpiderInfo(
     val gid: Long,
     var token: String? = null,
     val pages: Int,
-    val pTokenMap: MutableMap<Int, String> = hashMapOf(),
+    var pTokenMap: MutableMap<Int, String> = ConcurrentHashMap(),
     var startPage: Int = 0,
     var previewPages: Int = -1,
     var previewPerPage: Int = -1,
@@ -45,13 +47,6 @@ class SpiderInfo(
 )
 
 private val cbor = Cbor { ignoreUnknownKeys = true }
-
-private val spiderInfoCache by lazy {
-    DiskCache.Builder()
-        .directory(EhApplication.cacheDir / "spider_info_v2")
-        .maxSizeBytes(20 * 1024 * 1024)
-        .build()
-}
 
 fun readFromUniFile(file: UniFile): SpiderInfo? = runCatching {
     file.openInputStream().use { cbor.decodeFromByteArray<SpiderInfo>(it.readBytes()) }
@@ -68,19 +63,18 @@ fun SpiderInfo.saveToUniFile(file: UniFile) = runSuspendCatching {
 }
 
 fun readFromCache(gid: Long): SpiderInfo? = runCatching {
-    spiderInfoCache.openSnapshot(gid.toString())?.use {
-        cbor.decodeFromByteArray<SpiderInfo>(it.data.toFile().readBytes())
+    EhDB.getReadingState(gid)?.let { state ->
+        state.spiderInfo?.let {
+            cbor.decodeFromByteArray<SpiderInfo>(it).apply {
+                startPage = state.page
+                pTokenMap = ConcurrentHashMap(pTokenMap)
+            }
+        }
     }
-}.onFailure {
-    Log.e(TAG, "Error", it)
-}.getOrNull()
+}.onFailure { Log.e(TAG, "Cannot read persisted spider info", it) }.getOrNull()
 
-fun SpiderInfo.saveToCache() = runSuspendCatching {
-    spiderInfoCache.edit(gid.toString()) {
-        data.toFile().writeBytes(cbor.encodeToByteArray(this@saveToCache))
-    }
-}.onFailure {
-    Log.e(TAG, "Error", it)
+fun SpiderInfo.saveToCache() {
+    EhDB.putReadingState(gid, spiderInfo = cbor.encodeToByteArray(this))
 }
 
 private fun readLegacySpiderInfo(inputStream: InputStream): SpiderInfo? {

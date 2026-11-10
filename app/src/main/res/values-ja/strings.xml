@@ -55,7 +55,7 @@
     <string name="clipboard_gallery_url_snack_action">表示</string>
     <string name="please_wait">お待ちください…</string>
     <string name="app_link_not_verified_title">アプリのリンクが確認されていません</string>
-    <string name="app_link_not_verified_message">Android 12 以降の場合、EhViewer で E-Hentai のリンクを開くには確認済みのリンクを手動で追加する必要があります。</string>
+    <string name="app_link_not_verified_message">Android 12 以降の場合、EhReader で E-Hentai のリンクを開くには確認済みのリンクを手動で追加する必要があります。</string>
     <string name="open_settings">設定を開く</string>
     <string name="dont_show_again">今後表示しない</string>
     <!-- Gallery Activity -->
@@ -361,7 +361,7 @@
     <string name="default_download_label">デフォルトのダウンロードラベル</string>
     <!-- Download Service -->
     <string name="download_service">ダウンロードサービス</string>
-    <string name="download_service_label">EhViewer ダウンロードサービス</string>
+    <string name="download_service_label">EhReader ダウンロードサービス</string>
     <string name="download_speed_text_2">%1$s - 残り: %2$s</string>
     <string name="stat_download_action_stop_all">すべて停止</string>
     <string name="stat_509_alert_title">509 アラート</string>
@@ -626,4 +626,7 @@
     <plurals name="year">
         <item quantity="other">年</item>
     </plurals>
+    <string name="gallery_detail_local_error">保存済みのギャラリー情報を表示しています。%1$s</string>
+    <string name="gallery_detail_not_saved">未保存</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5（評価数は未保存）</string>
 </resources>

@@ -18,30 +18,29 @@
 package com.hippo.ehviewer.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Upsert
 
 @Dao
-interface LocalFavoritesDao : BasicDao<LocalFavoriteInfo> {
-    @Query("SELECT * FROM LOCAL_FAVORITES ORDER BY TIME DESC")
-    override fun list(): List<LocalFavoriteInfo>
+interface LocalFavoritesDao {
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM LOCAL_FAVORITES b JOIN GALLERY_METADATA m ON m.GID = b.GID ORDER BY b.TIME DESC")
+    fun list(): List<LocalFavoriteInfo>
 
-    @Query("SELECT * FROM LOCAL_FAVORITES WHERE TITLE LIKE :title ORDER BY TIME DESC")
-    fun list(title: String): List<LocalFavoriteInfo>
-
-    @Query("SELECT * FROM LOCAL_FAVORITES WHERE GID = :gid")
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM LOCAL_FAVORITES b JOIN GALLERY_METADATA m ON m.GID = b.GID WHERE b.GID = :gid")
     fun load(gid: Long): LocalFavoriteInfo?
 
-    @Query("SELECT EXISTS(SELECT * FROM LOCAL_FAVORITES WHERE GID = :gid)")
-    fun contains(gid: Long): Boolean
+    @Upsert
+    fun put(record: LocalFavoriteRecord)
 
-    @Insert
-    override fun insert(t: LocalFavoriteInfo): Long
-
-    @Delete
-    fun delete(localFavoriteInfo: LocalFavoriteInfo)
+    @Query("SELECT * FROM LOCAL_FAVORITES")
+    fun records(): List<LocalFavoriteRecord>
 
     @Query("DELETE FROM LOCAL_FAVORITES WHERE GID = :gid")
     fun deleteByKey(gid: Long)
+
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM LOCAL_FAVORITES b JOIN GALLERY_METADATA m ON m.GID = b.GID WHERE m.TITLE LIKE :title OR m.TITLE_JPN LIKE :title ORDER BY b.TIME DESC")
+    fun list(title: String): List<LocalFavoriteInfo>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM LOCAL_FAVORITES WHERE GID = :gid)")
+    fun contains(gid: Long): Boolean
 }

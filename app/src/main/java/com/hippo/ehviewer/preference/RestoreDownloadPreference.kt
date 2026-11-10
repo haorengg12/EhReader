@@ -15,142 +15,53 @@
  */
 package com.hippo.ehviewer.preference
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.util.AttributeSet
-import android.util.Log
-import com.hippo.ehviewer.GetText
+import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
-import com.hippo.ehviewer.client.EhEngine.fillGalleryListByApi
-import com.hippo.ehviewer.client.EhUrl
-import com.hippo.ehviewer.client.data.BaseGalleryInfo
-import com.hippo.ehviewer.client.parser.GalleryDetailUrlParser
 import com.hippo.ehviewer.download.DownloadManager
-import com.hippo.ehviewer.spider.SpiderDen.Companion.getGalleryDownloadDir
-import com.hippo.ehviewer.spider.SpiderInfo
-import com.hippo.ehviewer.spider.SpiderQueen.Companion.SPIDER_INFO_FILENAME
-import com.hippo.ehviewer.spider.readFromUniFile
-import com.hippo.ehviewer.spider.saveToUniFile
-import com.hippo.unifile.UniFile
-import com.hippo.unifile.openInputStream
-import com.hippo.util.launchUI
-import com.hippo.util.runSuspendCatching
+import com.hippo.ehviewer.download.DownloadStorage
 import com.hippo.util.withUIContext
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import okio.buffer
-import okio.source
 
-class RestoreDownloadPreference(
-    context: Context,
-    attrs: AttributeSet? = null,
-) : TaskPreference(context, attrs) {
-    private var restoreDirCount = 0
-    private val nonSpiderInfoItemList = mutableListOf<Long>()
-
-    @SuppressLint("ParcelCreator")
-    private class RestoreItem(val dirname: String, gid: Long, token: String) : BaseGalleryInfo(gid, token)
-
-    private fun getRestoreItem(dir: UniFile): RestoreItem? {
-        if (!dir.isDirectory) return null
-        return runCatching {
-            val result = dir.findFile(SPIDER_INFO_FILENAME)?.let {
-                readFromUniFile(it)?.run {
-                    GalleryDetailUrlParser.Result(gid, token!!)
-                }
-            } ?: dir.findFile(COMIC_INFO_FILE)?.let { file ->
-                file.openInputStream().source().buffer().use {
-                    GalleryDetailUrlParser.parse(it.readUtf8())
-                }.also {
-                    it?.apply { nonSpiderInfoItemList.add(gid) }
-                }
-            } ?: return null
-            val gid = result.gid
-            val dirname = dir.name!!
-            if (DownloadManager.containDownloadInfo(gid)) {
-                // Restore download dir to avoid re-download
-                val dbDirname = DownloadManager.getDownloadDirname(gid)
-                if (null == dbDirname || dirname != dbDirname) {
-                    DownloadManager.putDownloadDirname(gid, dirname)
-                    restoreDirCount++
-                }
-                return null
-            }
-            RestoreItem(dirname, gid, result.token)
-        }.onFailure {
-            Log.e(TAG, "Error", it)
-        }.getOrNull()
-    }
-
-    private suspend fun doRealWork(): List<RestoreItem>? {
-        val dir = Settings.downloadLocation ?: return null
-        val files = dir.listFiles() ?: return null
-        return runSuspendCatching {
-            files.mapNotNull { getRestoreItem(it) }.also {
-                fillGalleryListByApi(it, EhUrl.referer)
-            }
-        }.onFailure {
-            Log.e(TAG, "Error", it)
-        }.getOrNull()
-    }
-
-    override val jobTitle = JOB_TITLE_RESTORE_DOWNLOAD
+class RestoreDownloadPreference(context: Context, attrs: AttributeSet? = null) : TaskPreference(context, attrs) {
+    override val jobTitle = context.getString(R.string.settings_download_restore_download_items)
 
     override fun launchJob() {
-        if (singletonJob?.isActive == true) {
-            singletonJob?.invokeOnCompletion {
-                launchUI {
-                    mDialog.dismiss()
-                }
-            }
-        } else {
-            singletonJob = launch {
-                val result = doRealWork()
-                withUIContext {
-                    if (result == null) {
-                        showTip(RESTORE_FAILED)
-                    } else {
-                        if (result.isEmpty()) {
-                            showTip(RESTORE_COUNT_MSG(restoreDirCount))
-                        } else {
-                            var count = 0
-                            result.forEach { item ->
-                                if (null != item.title) {
-                                    val gid = item.gid
-                                    // Put to download
-                                    DownloadManager.addDownload(item, null)
-                                    // Put download dir to DB
-                                    DownloadManager.putDownloadDirname(gid, item.dirname)
-                                    // Create missing .ehviewer file
-                                    if (gid in nonSpiderInfoItemList) {
-                                        getGalleryDownloadDir(gid)?.run {
-                                            createFile(SPIDER_INFO_FILENAME)?.also {
-                                                SpiderInfo(gid, item.token, item.pages).saveToUniFile(it)
-                                            }
-                                        }
-                                    }
-                                    count++
-                                }
+        launch {
+            var count = 0
+            var attempted = 0
+            val selected = Settings.downloadLocation
+            val busy = DownloadManager.hasActiveDownloads()
+            if (!busy && selected != null) {
+                EhDB.allDownloadDirname.forEach { old ->
+                    if (old.phase == "complete") {
+                        attempted++
+                        val candidate = old.copy(rootUri = selected.uri.toString())
+                        if (DownloadStorage.verify(candidate)) {
+                            EhDB.putDownloadLocation(candidate)
+                            DownloadManager.getDownloadInfo(old.gid)?.let { info ->
+                                info.state = com.hippo.ehviewer.dao.DownloadInfo.STATE_FINISH
+                                info.legacy = 0
+                                EhDB.putDownloadInfo(info)
                             }
-                            showTip(RESTORE_COUNT_MSG(count + restoreDirCount))
+                            count++
                         }
                     }
-                    mDialog.dismiss()
                 }
+            }
+            withUIContext {
+                if (!DownloadManager.hasActiveDownloads()) DownloadManager.reloadFromDatabase()
+                showTip(
+                    when {
+                        count > 0 -> context.getString(R.string.settings_download_restore_successfully, count)
+                        busy || selected == null || attempted > 0 -> context.getString(R.string.settings_download_restore_failed)
+                        else -> context.getString(R.string.settings_download_restore_not_found)
+                    },
+                )
+                mDialog.dismiss()
             }
         }
     }
-
-    companion object {
-        private val TAG = RestoreDownloadPreference::class.java.simpleName
-        private val JOB_TITLE_RESTORE_DOWNLOAD = GetText.getString(R.string.settings_download_restore_download_items)
-        private val RESTORE_NOT_FOUND = GetText.getString(R.string.settings_download_restore_not_found)
-        private val RESTORE_FAILED = GetText.getString(R.string.settings_download_restore_failed)
-        private val RESTORE_COUNT_MSG =
-            { cnt: Int -> if (cnt == 0) RESTORE_NOT_FOUND else GetText.getString(R.string.settings_download_restore_successfully, cnt) }
-    }
 }
-
-private const val COMIC_INFO_FILE = "ComicInfo.xml"
-private var singletonJob: Job? = null

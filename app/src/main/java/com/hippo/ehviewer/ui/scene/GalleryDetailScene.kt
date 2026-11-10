@@ -48,6 +48,7 @@ import android.widget.ListView
 import android.widget.RatingBar
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.IntDef
@@ -102,6 +103,7 @@ import com.hippo.ehviewer.client.parser.TorrentParser
 import com.hippo.ehviewer.client.thumbUrl
 import com.hippo.ehviewer.dao.DownloadInfo
 import com.hippo.ehviewer.dao.Filter
+import com.hippo.ehviewer.dao.GalleryMetadata
 import com.hippo.ehviewer.download.DownloadManager as EhDownloadManager
 import com.hippo.ehviewer.download.DownloadManager.DownloadInfoListener
 import com.hippo.ehviewer.download.DownloadService
@@ -111,6 +113,7 @@ import com.hippo.ehviewer.spider.SpiderQueen
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.GET_FULL_HASH
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.MODE_READ
 import com.hippo.ehviewer.spider.SpiderQueen.Companion.SPIDER_INFO_FILENAME
+import com.hippo.ehviewer.spider.saveToCache
 import com.hippo.ehviewer.spider.saveToUniFile
 import com.hippo.ehviewer.ui.CommonOperations
 import com.hippo.ehviewer.ui.GalleryActivity
@@ -217,6 +220,9 @@ class GalleryDetailScene :
     private var mToken: String? = null
     private var mPage = 0
     private var mGalleryDetail: GalleryDetail? = null
+    private var mLocalMetadata: GalleryMetadata? = null
+    private var mDetailError: String? = null
+    private var mDetailErrorToast: Toast? = null
     private var mRequestId = IntIdGenerator.INVALID_ID
     private var mTorrentList: List<TorrentParser.Result>? = null
     private var requestStoragePermissionLauncher = registerForActivityResult(
@@ -240,7 +246,7 @@ class GalleryDetailScene :
     private var mModifyingFavorites = false
 
     @StringRes
-    private fun getRatingText(rating: Float): Int = when ((rating * 2).roundToInt()) {
+    private fun getRatingText(rating: Float): Int = when (if (rating.isFinite()) (rating * 2).roundToInt() else -1) {
         0 -> R.string.rating0
         1 -> R.string.rating1
         2 -> R.string.rating2
@@ -346,6 +352,7 @@ class GalleryDetailScene :
 
     override fun onResume() {
         super.onResume()
+        showDetailError()
         mRead ?: return
         mGalleryInfo?.let {
             // Other Actions
@@ -378,6 +385,8 @@ class GalleryDetailScene :
         mGid = savedInstanceState.getLong(KEY_GID)
         mToken = savedInstanceState.getString(KEY_TOKEN)
         mGalleryDetail = savedInstanceState.getParcelableCompat(KEY_GALLERY_DETAIL)
+        mDetailError = savedInstanceState.getString(KEY_DETAIL_ERROR)
+        if (savedInstanceState.getBoolean(KEY_LOCAL_METADATA)) mLocalMetadata = EhDB.getGalleryMetadata(gid)
         mRequestId = savedInstanceState.getInt(KEY_REQUEST_ID)
     }
 
@@ -391,12 +400,14 @@ class GalleryDetailScene :
         }
         outState.putLong(KEY_GID, mGid)
         if (mToken != null) {
-            outState.putString(KEY_TOKEN, mAction)
+            outState.putString(KEY_TOKEN, mToken)
         }
         if (mGalleryDetail != null) {
             outState.putParcelable(KEY_GALLERY_DETAIL, mGalleryDetail)
         }
         outState.putInt(KEY_REQUEST_ID, mRequestId)
+        outState.putString(KEY_DETAIL_ERROR, mDetailError)
+        outState.putBoolean(KEY_LOCAL_METADATA, mLocalMetadata != null)
     }
 
     private fun ensurePopMenu() {
@@ -411,10 +422,7 @@ class GalleryDetailScene :
                 override fun onMenuItemClick(item: MenuItem): Boolean {
                     when (item.itemId) {
                         R.id.action_refresh -> {
-                            if (mState != STATE_REFRESH && mState != STATE_REFRESH_HEADER) {
-                                adjustViewVisibility(STATE_REFRESH, true)
-                                request()
-                            }
+                            refreshGalleryDetail()
                             return true
                         }
                         R.id.action_add_tag -> {
@@ -573,14 +581,16 @@ class GalleryDetailScene :
                 adjustViewVisibility(STATE_REFRESH, false)
             }
         } else {
-            mTip!!.setText(R.string.error_cannot_find_gallery)
-            adjustViewVisibility(STATE_FAILED, false)
+            onGetGalleryDetailFailure(EhException(getString(R.string.error_cannot_find_gallery)))
         }
         EhDownloadManager.addDownloadInfoListener(this)
         return view
     }
 
     override fun onDestroyView() {
+        mDetailErrorToast?.cancel()
+        mDetailErrorToast = null
+        mState = STATE_INIT
         super.onDestroyView()
         EhDownloadManager.removeDownloadInfoListener(this)
         mTip = null
@@ -664,6 +674,32 @@ class GalleryDetailScene :
             .setCallback(callback)
         request.enqueue(this)
         return true
+    }
+
+    private fun refreshGalleryDetail() {
+        val application = context?.applicationContext as? EhApplication ?: return
+        if (application.containGlobalStuff(mRequestId)) return
+        // 已有信息在重试时继续可读；没有信息时沿用原加载页。
+        if (request() && mGalleryDetail == null) adjustViewVisibility(STATE_REFRESH, true)
+    }
+
+    override fun onPause() {
+        mDetailErrorToast?.cancel()
+        mDetailErrorToast = null
+        super.onPause()
+    }
+
+    private fun showDetailError() {
+        val error = mDetailError ?: return
+        if (!isResumed || mThumb == null) return
+        // 每次失败只提示一次；返回页面或旋转后不重复已显示的 Toast。
+        mDetailError = null
+        mDetailErrorToast?.cancel()
+        mDetailErrorToast = Toast.makeText(
+            requireContext(),
+            getString(R.string.gallery_detail_local_error, error),
+            Toast.LENGTH_LONG,
+        ).also { it.show() }
     }
 
     private fun setActionDrawable(text: TextView?, @DrawableRes resId: Int) {
@@ -756,7 +792,7 @@ class GalleryDetailScene :
         }
         if (ACTION_GALLERY_INFO == mAction && mGalleryInfo != null) {
             val gi: GalleryInfo = mGalleryInfo!!
-            mThumb!!.load(getThumbKey(gi.gid), gi.thumbUrl!!, hardware = false)
+            mThumb!!.load(getThumbKey(gi.gid), com.hippo.ehviewer.spider.DownloadInfoMagics.encodeMagicRequest(DownloadInfo(gi)), hardware = false)
             mTitle!!.text = EhUtils.getSuitableTitle(gi)
             mUploader!!.text = gi.uploader
             mUploader!!.alpha = if (gi.disowned) .5f else 1f
@@ -808,32 +844,43 @@ class GalleryDetailScene :
             return
         }
         val resources = resources
-        mThumb!!.load(getThumbKey(gd.gid), gd.thumbUrl!!, false, hardware = false)
+        mThumb!!.load(getThumbKey(gd.gid), com.hippo.ehviewer.spider.DownloadInfoMagics.encodeMagicRequest(DownloadInfo(gd)), false, hardware = false)
         mTitle!!.text = EhUtils.getSuitableTitle(gd)
         mUploader!!.text = gd.uploader
         mUploader!!.alpha = if (gd.disowned) .5f else 1f
         mCategory!!.text = EhUtils.getCategory(gd.category)
         mCategory!!.setTextColor(EhUtils.getCategoryColor(gd.category))
         updateDownloadText()
-        mLanguage!!.text = gd.language
-        mPages!!.text = resources.getQuantityString(
-            R.plurals.page_count,
-            gd.pages,
-            gd.pages,
-        )
-        mSize!!.text = gd.size
-        mPosted!!.text = gd.posted
-        mFavoredTimes!!.text = resources.getString(R.string.favored_times, gd.favoriteCount)
-        if (gd.newerVersions.isNotEmpty()) {
-            mNewerVersion!!.visibility = View.VISIBLE
+        val local = mLocalMetadata
+        val missing = getString(R.string.gallery_detail_not_saved)
+        mLanguage!!.text = gd.language ?: local?.simpleLanguage ?: if (local != null) missing else null
+        mPages!!.text = if (local != null && local.pages == null) {
+            missing
+        } else {
+            resources.getQuantityString(
+                R.plurals.page_count,
+                gd.pages,
+                gd.pages,
+            )
         }
-        mRatingText!!.text = getAllRatingText(gd.rating, gd.ratingCount)
-        mRating!!.rating = gd.rating
+        mSize!!.text = gd.size ?: if (local != null) missing else null
+        mPosted!!.text = gd.posted ?: if (local != null) missing else null
+        mFavoredTimes!!.text = if (local != null && local.favoriteCount == null) missing else resources.getString(R.string.favored_times, gd.favoriteCount)
+        mNewerVersion!!.visibility = if (gd.newerVersions.isNotEmpty()) View.VISIBLE else View.GONE
+        mRatingText!!.text = when {
+            !gd.rating.isFinite() -> missing
+            local != null && local.ratingCount == null -> getString(R.string.gallery_detail_rating_without_count, gd.rating)
+            else -> getAllRatingText(gd.rating, gd.ratingCount)
+        }
+        mRating!!.rating = gd.rating.takeIf { it.isFinite() } ?: 0f
         updateFavoriteDrawable()
-        mTorrent!!.text = resources.getString(R.string.torrent_count, gd.torrentCount)
+        mTorrent!!.text = if (local != null && local.torrentCount == null) getString(R.string.torrents) else resources.getString(R.string.torrent_count, gd.torrentCount)
         bindTags(gd.tags)
-        bindComments(gd.comments!!.comments)
+        if (local != null && local.tags == null) mNoTags?.text = missing
+        bindComments(gd.comments?.comments)
         bindPreviews(gd)
+        mComments?.visibility = if (Settings.showComments && (local == null || gd.comments != null)) View.VISIBLE else View.GONE
+        mPreviews?.visibility = if (local == null || gd.previewSet != null) View.VISIBLE else View.GONE
     }
 
     private fun bindTags(tagGroups: Array<GalleryTagGroup>?) {
@@ -842,6 +889,7 @@ class GalleryDetailScene :
             return
         }
         mTags!!.removeViews(1, mTags!!.childCount - 1)
+        mNoTags!!.setText(R.string.no_tags)
         if (tagGroups.isNullOrEmpty()) {
             mNoTags!!.visibility = View.VISIBLE
             return
@@ -1109,6 +1157,7 @@ class GalleryDetailScene :
             mInfo -> {
                 val args = Bundle()
                 args.putParcelable(GalleryInfoScene.KEY_GALLERY_DETAIL, galleryDetail)
+                args.putBoolean(GalleryInfoScene.KEY_LOCAL_METADATA, mLocalMetadata != null)
                 startScene(Announcer(GalleryInfoScene::class.java).setArgs(args))
             }
             mHeartGroup -> {
@@ -1289,12 +1338,8 @@ class GalleryDetailScene :
                                     upgradeFrom = gd.gid,
                                 )
                                 SpiderQueen.readPreviews(body, 0, spiderInfo)
-                                val dirName = FileUtils.sanitizeFilename("${result.gid}-${EhUtils.getSuitableTitle(result)}")
-                                SpiderDen.perSafeDownloadDir(result.gid, dirName)!!.run {
-                                    createFile(SPIDER_INFO_FILENAME)!!.also {
-                                        spiderInfo.saveToUniFile(it)
-                                    }
-                                }
+                                EhDB.putGalleryMetadata(result, url)
+                                spiderInfo.saveToCache()
                                 // Start download
                                 val label = EhDownloadManager.getDownloadInfo(gd.gid)?.label
                                 val intent = Intent(activity, DownloadService::class.java)
@@ -1332,8 +1377,7 @@ class GalleryDetailScene :
                             } else {
                                 showTip(R.string.download_state_failed, LENGTH_SHORT)
                                 launchIO {
-                                    SpiderDen.getGalleryDownloadDir(newerVersion.gid)?.takeIf { it.exists() }?.delete()
-                                    EhDownloadManager.removeDownloadDirname(newerVersion.gid)
+                                    // 服务启动失败时保留已登记任务；重试沿用同一 GID，不删除已有内容。
                                 }
                             }
                         }
@@ -1607,16 +1651,33 @@ class GalleryDetailScene :
     override fun onUpdateLabels() {}
 
     private fun onGetGalleryDetailSuccess(result: GalleryDetail) {
+        mLocalMetadata = null
+        mDetailError = null
+        mDetailErrorToast?.cancel()
+        mDetailErrorToast = null
         mGalleryDetail = result
         updateDownloadState()
         adjustViewVisibility(STATE_NORMAL, true)
         bindViewSecond()
     }
 
+    /** 在线失败仍展示主库已有信息并短暂提示错误，不把本地快照当成在线成功反写。 */
     private fun onGetGalleryDetailFailure(e: Exception) {
         Log.e(TAG, "Error", e)
+        val error = ExceptionUtils.getReadableString(e)
+        val local = EhDB.getGalleryMetadata(gid)
+        val detail = local?.galleryDetail(EhDB.currentAccount()) ?: mGalleryDetail
+        if (detail != null) {
+            mLocalMetadata = local
+            mDetailError = error
+            mGalleryDetail = detail
+            updateDownloadState()
+            adjustViewVisibility(STATE_NORMAL, true)
+            bindViewSecond()
+            showDetailError()
+            return
+        }
         if (null != mTip) {
-            val error = ExceptionUtils.getReadableString(e)
             mTip!!.text = error
             adjustViewVisibility(STATE_FAILED, true)
         }
@@ -1771,14 +1832,11 @@ class GalleryDetailScene :
             val checked = mBuilder.isChecked
             Settings.putRemoveImageFiles(checked)
             if (checked) {
-                val file = SpiderDen.getGalleryDownloadDir(mGalleryInfo.gid)
-                // DB Actions
-                EhDownloadManager.removeDownloadDirname(mGalleryInfo.gid)
-                // Other Actions
                 lifecycleScope.launchIO {
-                    runCatching {
-                        file?.delete()
-                    }
+                    val removed = runCatching { com.hippo.ehviewer.download.DownloadStorage.deleteFiles(mGalleryInfo.gid) }
+                        .onFailure { Log.e("GalleryDetailScene", "Cannot delete gallery files", it) }
+                        .getOrDefault(false)
+                    if (!removed) withUIContext { showTip(R.string.error_write_failed, LENGTH_LONG) }
                 }
             }
         }
@@ -2157,6 +2215,8 @@ class GalleryDetailScene :
         private const val TAG_STATUS_DN = "↓"
         private const val KEY_GALLERY_DETAIL = "gallery_detail"
         private const val KEY_REQUEST_ID = "request_id"
+        private const val KEY_DETAIL_ERROR = "detail_error"
+        private const val KEY_LOCAL_METADATA = "local_metadata"
         private const val TRANSITION_ANIMATION_DISABLED = true
         private fun getArtist(tagGroups: Array<GalleryTagGroup>?): String? {
             if (null == tagGroups) {

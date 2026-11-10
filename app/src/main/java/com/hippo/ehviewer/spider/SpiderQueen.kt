@@ -21,9 +21,11 @@ import androidx.annotation.IntDef
 import androidx.collection.LongSparseArray
 import androidx.collection.set
 import com.hippo.ehviewer.EhApplication.Companion.okHttpClient as plainTextOkHttpClient
+import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.GetText
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhEngine
 import com.hippo.ehviewer.client.EhRequestBuilder
 import com.hippo.ehviewer.client.EhUrl
@@ -32,11 +34,13 @@ import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.client.exception.QuotaExceededException
 import com.hippo.ehviewer.client.parser.GalleryDetailParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
+import com.hippo.ehviewer.download.DownloadStorage
 import com.hippo.image.Image
 import com.hippo.unifile.UniFile
 import com.hippo.util.ExceptionUtils
 import com.hippo.util.launchIO
 import com.hippo.util.runSuspendCatching
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -56,6 +60,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.coroutines.executeAsync
 
 class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineScope {
@@ -78,6 +83,21 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
     fun addOnSpiderListener(listener: OnSpiderListener) {
         synchronized(mSpiderListeners) { mSpiderListeners.add(listener) }
+        // 订阅完成后才启动下载，避免本地命中或准备失败早于监听器注册。
+        launchIO {
+            try {
+                check(awaitReady()) { "Cannot prepare gallery" }
+                synchronized(mSpiderListeners) { if (listener in mSpiderListeners) listener.onGetPages(size) }
+                updateMode()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Cannot start gallery task", error)
+                synchronized(mSpiderListeners) {
+                    if (listener in mSpiderListeners) listener.onFinish(0, 0, galleryInfo.pages.coerceAtLeast(1))
+                }
+            }
+        }
     }
 
     fun removeOnSpiderListener(listener: OnSpiderListener) {
@@ -110,6 +130,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     }
 
     private fun notifyPageSuccess(index: Int) {
+        mSpiderInfo.saveToCache()
         synchronized(mSpiderListeners) {
             mSpiderListeners.forEach {
                 it.onPageSuccess(
@@ -137,16 +158,34 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     }
 
     private fun notifyAllPageDownloaded() {
-        synchronized(mSpiderListeners) {
-            mSpiderListeners.forEach {
-                it.onFinish(
-                    mFinishedPages.get(),
-                    mDownloadedPages.get(),
-                    mPageStateArray.size,
-                )
+        if (!finishing.compareAndSet(false, true)) return
+        launch {
+            var success = mFinishedPages.get()
+            if (downloadMode && success == size) {
+                try {
+                    writeSpiderInfoToLocal()
+                    val context = currentCoroutineContext()
+                    DownloadStorage.finish(galleryInfo.gid, size) { context.ensureActive() }
+                    mSpiderDen.downloadDir = DownloadStorage.imageDirectory(galleryInfo.gid)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(TAG, "Cannot finalize gallery", error)
+                    EhDB.getDownloadLocation(galleryInfo.gid)?.let {
+                        it.lastError = error.message
+                        EhDB.putDownloadLocation(it)
+                    }
+                    success = (size - 1).coerceAtLeast(0)
+                }
+            }
+            if (success == size) {
+                mSpiderInfo.upgradeFrom = null
+                mSpiderInfo.saveToCache()
+            }
+            synchronized(mSpiderListeners) {
+                mSpiderListeners.forEach { it.onFinish(success, mDownloadedPages.get(), size) }
             }
         }
-        mSpiderInfo.upgradeFrom = null
     }
 
     fun notifyGetImageSuccess(index: Int, image: Image) {
@@ -165,6 +204,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         }
     }
 
+    private val finishing = AtomicBoolean(false)
     private var downloadMode = false
     val isReady
         get() = this::mSpiderInfo.isInitialized && this::mPageStateArray.isInitialized
@@ -182,6 +222,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         // Update download page
         val intoDownloadMode = mode == MODE_DOWNLOAD
         if (intoDownloadMode && !downloadMode) {
+            finishing.set(false)
             // Clear download state
             synchronized(mPageStateLock) {
                 val temp: IntArray = mPageStateArray
@@ -229,7 +270,16 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         check(!(mReadReference < 0 || mDownloadReference < 0)) { "Mode reference < 0" }
     }
 
-    private val prepareJob = launchIO { doPrepare() }
+    private val prepareJob = launchIO {
+        try {
+            doPrepare()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            // 保持父作用域可通知失败，目录撤权等异常不能让下载队列永久停在运行状态。
+            Log.e(TAG, "Cannot prepare gallery", error)
+        }
+    }
 
     private suspend fun doPrepare() {
         mSpiderDen.downloadDir = SpiderDen.getGalleryDownloadDir(galleryInfo.gid)?.takeIf { it.isDirectory }
@@ -243,20 +293,10 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         mOldDownloadDir = mSpiderInfo.upgradeFrom?.let { gid ->
             SpiderDen.getGalleryDownloadDir(gid)?.takeIf { it.isDirectory }
         }
-        mOldDownloadDir?.findFile(SPIDER_INFO_FILENAME)?.let { oldSpiderInfoFile ->
-            val oldSpiderInfo = readFromUniFile(oldSpiderInfoFile)
-            if (oldSpiderInfo != null && oldSpiderInfo.gid == mSpiderInfo.upgradeFrom) {
-                if (oldSpiderInfo.pTokenMap.size != oldSpiderInfo.pages) {
-                    getPTokenFromMultiPageViewer(
-                        oldSpiderInfo.gid,
-                        oldSpiderInfo.token!!,
-                        oldSpiderInfo,
-                    )
-                    if (oldSpiderInfo.pTokenMap.size == oldSpiderInfo.pages) {
-                        oldSpiderInfo.saveToUniFile(oldSpiderInfoFile)
-                    }
-                }
-                mOldHashMap = oldSpiderInfo.pTokenMap.entries.associateBy({ it.value }, { it.key }).toMutableMap()
+        mSpiderInfo.upgradeFrom?.let { oldGid ->
+            val oldInfo = readFromCache(oldGid)
+            if (oldInfo != null) {
+                mOldHashMap = oldInfo.pTokenMap.entries.associateBy({ it.value }, { it.key }).toMutableMap()
             }
         }
     }
@@ -371,16 +411,12 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
     fun putStartPage(page: Int) {
         mSpiderInfo.startPage = page
+        EhDB.putReadingState(galleryInfo.gid, page = page)
     }
 
-    private fun readSpiderInfoFromLocal(): SpiderInfo? = mSpiderDen.downloadDir?.run {
-        findFile(SPIDER_INFO_FILENAME)?.let { file ->
-            readFromUniFile(file)?.takeIf {
-                it.gid == galleryInfo.gid && it.token == galleryInfo.token
-            }
-        }
+    private fun readSpiderInfoFromLocal(): SpiderInfo? = readFromCache(galleryInfo.gid)?.takeIf {
+        it.gid == galleryInfo.gid && it.token == galleryInfo.token
     }
-        ?: readFromCache(galleryInfo.gid)?.takeIf { it.gid == galleryInfo.gid && it.token == galleryInfo.token }
 
     private suspend fun readSpiderInfoFromInternet(): SpiderInfo? {
         val url = EhUrl.getGalleryDetailUrl(
@@ -394,9 +430,12 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         return runSuspendCatching {
             plainTextOkHttpClient.newCall(request).executeAsync().use { response ->
                 val body = response.body.string()
-                val pages = GalleryDetailParser.parsePages(body)
+                val detail = GalleryDetailParser.parse(body)
+                EhDB.putGalleryMetadata(detail, url, EhCookieStore.getCookieValue(EhUrl.HOST_E.toHttpUrl(), EhCookieStore.KEY_IPB_MEMBER_ID))
+                val pages = detail.pages
                 val spiderInfo = SpiderInfo(galleryInfo.gid, galleryInfo.token, pages)
                 readPreviews(body, 0, spiderInfo)
+                spiderInfo.saveToCache()
                 spiderInfo
             }
         }.onFailure {
@@ -463,7 +502,6 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     @Synchronized
     private fun writeSpiderInfoToLocal() {
         if (!isReady) return
-        mSpiderDen.downloadDir?.run { createFile(SPIDER_INFO_FILENAME)?.also { mSpiderInfo.saveToUniFile(it) } }
         mSpiderInfo.saveToCache()
     }
 
@@ -607,7 +645,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
                 mOldDownloadDir?.let { oldDir ->
                     (mOldHashMap?.get(pToken) ?: mOldHashMap?.get(pToken.take(10)))?.let { oldIndex ->
-                        if (mSpiderDen.copyFromUniFileToDownloadDir(oldDir, oldIndex, index)) {
+                        if (mSpiderDen.copyFromUniFileToDownloadDir(oldDir, oldIndex, index) || mSpiderInfo.upgradeFrom?.let { mSpiderDen.copyFromArchive(it, oldIndex, index) } == true) {
                             return updatePageState(index, STATE_FINISHED)
                         }
                     }
@@ -794,6 +832,9 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         private const val FORCE_RETRY = "Force retry"
         private const val WORKER_DEBUG_TAG = "SpiderQueenWorker"
 
+        @Synchronized
+        fun isInUse(gid: Long): Boolean = sQueenMap[gid]?.let { it.mReadReference > 0 || it.mDownloadReference > 0 } == true
+
         fun reset(gid: Long) {
             sQueenMap[gid]?.resetStates()
         }
@@ -802,14 +843,15 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
             if (URL_509_PATTERN in url) throw QuotaExceededException()
         }
 
+        @Synchronized
         fun obtainSpiderQueen(galleryInfo: GalleryInfo, @Mode mode: Int): SpiderQueen {
             val gid = galleryInfo.gid
             return (sQueenMap[gid] ?: SpiderQueen(galleryInfo).also { sQueenMap[gid] = it }).apply {
                 setMode(mode)
-                launchIO { if (awaitReady()) updateMode() }
             }
         }
 
+        @Synchronized
         fun releaseSpiderQueen(queen: SpiderQueen, @Mode mode: Int) {
             queen.run {
                 clearMode(mode)

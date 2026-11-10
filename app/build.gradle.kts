@@ -149,6 +149,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     // https://developer.android.com/jetpack/androidx/releases/activity
     implementation(libs.androidx.activity)
     implementation(libs.androidx.appcompat)

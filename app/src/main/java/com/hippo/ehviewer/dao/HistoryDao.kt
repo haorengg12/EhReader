@@ -19,36 +19,28 @@ package com.hippo.ehviewer.dao
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Insert
 import androidx.room.Query
-import androidx.room.Update
+import androidx.room.Upsert
 
 @Dao
-interface HistoryDao : BasicDao<HistoryInfo> {
-    @Query("SELECT * FROM HISTORY WHERE GID = :gid")
+interface HistoryDao {
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM HISTORY b JOIN GALLERY_METADATA m ON m.GID = b.GID ORDER BY b.TIME DESC")
+    fun list(): List<HistoryInfo>
+
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM HISTORY b JOIN GALLERY_METADATA m ON m.GID = b.GID WHERE b.GID = :gid")
     fun load(gid: Long): HistoryInfo?
 
-    @Query("SELECT * FROM HISTORY ORDER BY TIME DESC")
-    override fun list(): List<HistoryInfo>
+    @Upsert
+    fun put(record: HistoryRecord)
 
-    @Query("SELECT * FROM HISTORY ORDER BY TIME DESC LIMIT :limit OFFSET :offset")
-    fun list(offset: Int, limit: Int): List<HistoryInfo>
+    @Query("SELECT * FROM HISTORY")
+    fun records(): List<HistoryRecord>
 
-    @Query("SELECT * FROM HISTORY ORDER BY TIME DESC")
+    @Query("DELETE FROM HISTORY WHERE GID = :gid")
+    fun deleteByKey(gid: Long)
+
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.TIME FROM HISTORY b JOIN GALLERY_METADATA m ON m.GID = b.GID ORDER BY b.TIME DESC")
     fun listLazy(): PagingSource<Int, HistoryInfo>
-
-    @Update
-    fun update(historyInfo: HistoryInfo)
-
-    @Insert
-    override fun insert(t: HistoryInfo): Long
-
-    @Delete
-    fun delete(historyInfo: HistoryInfo)
-
-    @Delete
-    fun delete(historyInfo: List<HistoryInfo>)
 
     @Query("DELETE FROM HISTORY")
     fun deleteAll()

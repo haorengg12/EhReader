@@ -31,21 +31,10 @@ class CleanRedundancyPreference(
     context: Context,
     attrs: AttributeSet? = null,
 ) : TaskPreference(context, attrs) {
-    private fun clearFile(file: UniFile): Boolean {
-        var name = file.name ?: return false
-        val index = name.indexOf('-')
-        if (index >= 0) {
-            name = name.substring(0, index)
-        }
-        val gid = name.toLongOrNull() ?: return false
-        if (downloadManager.containDownloadInfo(gid)) {
-            return false
-        }
-        file.delete()
-        return true
+    private fun doRealWork(): Int = com.hippo.ehviewer.EhDB.allDownloadDirname.count { location ->
+        !downloadManager.containDownloadInfo(location.gid) &&
+            runCatching { com.hippo.ehviewer.download.DownloadStorage.deleteFiles(location.gid) }.getOrDefault(false)
     }
-
-    private fun doRealWork(): Int = Settings.downloadLocation?.listFiles()?.sumOf { clearFile(it).compareTo(false) } ?: 0
 
     override val jobTitle = JOB_TITLE_CLEAR_REDUNDANCY
 
