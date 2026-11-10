@@ -9,6 +9,10 @@ import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.dao.DownloadDirname
+import com.hippo.ehviewer.spider.SpiderInfo
+import com.hippo.ehviewer.spider.encodeSpiderInfo
+import com.hippo.ehviewer.spider.readFromCache
+import com.hippo.ehviewer.spider.readFromUniFile
 import com.hippo.unifile.UniFile
 import com.hippo.unifile.openInputStream
 import com.hippo.unifile.openOutputStream
@@ -79,7 +83,12 @@ object DownloadStorage {
                 Settings.downloadLocation?.uri?.toString(),
                 Settings.saveAsCbz,
             ) as StorageFile
-            ).file
+            ).file.also {
+            val recovery = readFromCache(info.gid) ?: EhDB.getGalleryMetadata(info.gid)?.let { metadata ->
+                metadata.pages?.takeIf { it > 0 }?.let { SpiderInfo(metadata.gid, metadata.token, it) }
+            } ?: throw java.io.IOException("Missing gallery recovery identity")
+            saveRecoveryInfo(recovery)
+        }
     }
 
     fun finish(gid: Long, pages: Int, checkActive: () -> Unit = {}) = files.finish(gid, pages, checkActive)
@@ -90,6 +99,26 @@ object DownloadStorage {
         file.openInputStream().use { BitmapFactory.decodeStream(it, null, options) }
         options.outWidth > 0 && options.outHeight > 0
     }.getOrDefault(false)
+
+    /** 正常下载准备、完成及退出时保存 .ehreader；恢复旧的新布局任务时也补齐该文件。 */
+    @Synchronized
+    fun saveRecoveryInfo(info: SpiderInfo) {
+        val location = EhDB.getDownloadLocation(info.gid) ?: return
+        val directory = container(info.gid) ?: throw java.io.IOException("Download directory unavailable")
+        info.downloadFormat = location.format
+        writeRecoveryInfo(directory, info)
+    }
+
+    @Synchronized
+    internal fun writeRecoveryInfo(directory: UniFile, info: SpiderInfo) = GalleryRecoveryFile.write(StorageFile(directory), info.encodeSpiderInfo())
+
+    fun readRecoveryInfo(directory: UniFile): SpiderInfo? = GalleryRecoveryFile.names.firstNotNullOfOrNull { name ->
+        directory.findFile(name)?.let(::readFromUniFile)
+    }
+
+    internal fun storageFile(file: UniFile): GalleryFile = StorageFile(file)
+    internal fun uniFile(file: GalleryFile): UniFile = (file as StorageFile).file
+    internal fun removeReadCache(rootUri: String, gid: Long): Boolean = readCache.removeGallery(rootUri, gid)
 
     fun deleteFiles(gid: Long): Boolean {
         check(!com.hippo.ehviewer.spider.SpiderQueen.isInUse(gid)) { "Gallery is being read or downloaded" }

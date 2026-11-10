@@ -17,53 +17,30 @@ package com.hippo.ehviewer.preference
 
 import android.content.Context
 import android.util.AttributeSet
-import com.hippo.ehviewer.GetText
+import android.util.Log
 import com.hippo.ehviewer.R
-import com.hippo.ehviewer.Settings
-import com.hippo.ehviewer.download.DownloadManager as downloadManager
-import com.hippo.unifile.UniFile
-import com.hippo.util.launchUI
+import com.hippo.ehviewer.download.DownloadMaintenance
+import com.hippo.util.runSuspendCatching
 import com.hippo.util.withUIContext
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-class CleanRedundancyPreference(
-    context: Context,
-    attrs: AttributeSet? = null,
-) : TaskPreference(context, attrs) {
-    private fun doRealWork(): Int = com.hippo.ehviewer.EhDB.allDownloadDirname.count { location ->
-        !downloadManager.containDownloadInfo(location.gid) &&
-            runCatching { com.hippo.ehviewer.download.DownloadStorage.deleteFiles(location.gid) }.getOrDefault(false)
-    }
-
-    override val jobTitle = JOB_TITLE_CLEAR_REDUNDANCY
+class CleanRedundancyPreference(context: Context, attrs: AttributeSet? = null) : TaskPreference(context, attrs) {
+    override val jobTitle = context.getString(R.string.settings_download_clean_redundancy)
 
     override fun launchJob() {
-        if (singletonJob?.isActive == true) {
-            singletonJob?.invokeOnCompletion {
-                launchUI {
-                    mDialog.dismiss()
+        launch {
+            val result = runSuspendCatching { DownloadMaintenance.run(restore = false) }
+                .onFailure { Log.e("CleanRedundancyPreference", "Cannot clean downloads", it) }.getOrNull()
+            withUIContext {
+                val message = when {
+                    result == null -> context.getString(R.string.settings_download_clean_redundancy_failed)
+                    result.removed == 0 && result.failed == 0 && result.skipped == 0 && !result.stopped -> context.getString(R.string.settings_download_clean_redundancy_no_redundancy)
+                    else -> context.getString(R.string.settings_download_clean_redundancy_report, result.removed, result.skipped, result.failed) +
+                        if (result.stopped) "\n" + context.getString(R.string.settings_download_maintenance_stopped) else ""
                 }
-            }
-        } else {
-            singletonJob = launch {
-                val cnt = doRealWork()
-                withUIContext {
-                    showTip(FINAL_CLEAR_REDUNDANCY_MSG(cnt))
-                    mDialog.dismiss()
-                }
+                showTip(message)
+                mDialog.dismiss()
             }
         }
     }
-
-    companion object {
-        private val JOB_TITLE_CLEAR_REDUNDANCY = GetText.getString(R.string.settings_download_clean_redundancy)
-        private val NO_REDUNDANCY = GetText.getString(R.string.settings_download_clean_redundancy_no_redundancy)
-        private val CLEAR_REDUNDANCY_DONE =
-            { cnt: Int -> GetText.getString(R.string.settings_download_clean_redundancy_done, cnt) }
-        private val FINAL_CLEAR_REDUNDANCY_MSG =
-            { cnt: Int -> if (cnt == 0) NO_REDUNDANCY else CLEAR_REDUNDANCY_DONE(cnt) }
-    }
 }
-
-private var singletonJob: Job? = null

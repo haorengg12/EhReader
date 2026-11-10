@@ -17,11 +17,11 @@ package com.hippo.ehviewer.preference
 
 import android.content.Context
 import android.util.AttributeSet
-import com.hippo.ehviewer.EhDB
+import android.util.Log
 import com.hippo.ehviewer.R
-import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.download.DownloadMaintenance
 import com.hippo.ehviewer.download.DownloadManager
-import com.hippo.ehviewer.download.DownloadStorage
+import com.hippo.util.runSuspendCatching
 import com.hippo.util.withUIContext
 import kotlinx.coroutines.launch
 
@@ -30,36 +30,17 @@ class RestoreDownloadPreference(context: Context, attrs: AttributeSet? = null) :
 
     override fun launchJob() {
         launch {
-            var count = 0
-            var attempted = 0
-            val selected = Settings.downloadLocation
-            val busy = DownloadManager.hasActiveDownloads()
-            if (!busy && selected != null) {
-                EhDB.allDownloadDirname.forEach { old ->
-                    if (old.phase == "complete") {
-                        attempted++
-                        val candidate = old.copy(rootUri = selected.uri.toString())
-                        if (DownloadStorage.verify(candidate)) {
-                            EhDB.putDownloadLocation(candidate)
-                            DownloadManager.getDownloadInfo(old.gid)?.let { info ->
-                                info.state = com.hippo.ehviewer.dao.DownloadInfo.STATE_FINISH
-                                info.legacy = 0
-                                EhDB.putDownloadInfo(info)
-                            }
-                            count++
-                        }
-                    }
-                }
-            }
+            val result = runSuspendCatching { DownloadMaintenance.run(restore = true) }
+                .onFailure { Log.e("RestoreDownloadPreference", "Cannot restore downloads", it) }.getOrNull()
             withUIContext {
-                if (!DownloadManager.hasActiveDownloads()) DownloadManager.reloadFromDatabase()
-                showTip(
-                    when {
-                        count > 0 -> context.getString(R.string.settings_download_restore_successfully, count)
-                        busy || selected == null || attempted > 0 -> context.getString(R.string.settings_download_restore_failed)
-                        else -> context.getString(R.string.settings_download_restore_not_found)
-                    },
-                )
+                if (result != null && result.restored > 0 && !DownloadManager.hasActiveDownloads()) DownloadManager.reloadFromDatabase()
+                val message = when {
+                    result == null -> context.getString(R.string.settings_download_restore_failed)
+                    result.restored == 0 && result.failed == 0 && result.skipped == 0 && !result.stopped -> context.getString(R.string.settings_download_restore_not_found)
+                    else -> context.getString(R.string.settings_download_restore_report, result.restored, result.skipped, result.failed) +
+                        if (result.stopped) "\n" + context.getString(R.string.settings_download_maintenance_stopped) else ""
+                }
+                showTip(message)
                 mDialog.dismiss()
             }
         }

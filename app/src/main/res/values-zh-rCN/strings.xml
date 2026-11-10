@@ -494,13 +494,13 @@
     <string name="settings_download_download_origin_image_force">总是启用</string>
     <string name="settings_download_download_origin_image_only">仅下载时启用</string>
     <string name="settings_download_task_confirm">确定要执行操作？</string>
-    <string name="settings_download_restore_download_items">重新关联下载文件</string>
-    <string name="settings_download_restore_download_items_summary">核验已登记下载在所选根目录下的文件。缺少记录时请先还原新版数据库备份；不扫描或修改未知目录。</string>
+    <string name="settings_download_restore_download_items">恢复下载项</string>
+    <string name="settings_download_restore_download_items_summary">扫描当前下载目录，恢复可识别画廊并补齐恢复信息。</string>
     <string name="settings_download_restore_not_found">未找到可恢复下载项</string>
     <string name="settings_download_restore_failed">恢复失败</string>
     <string name="settings_download_restore_successfully">成功恢复 %d 项</string>
     <string name="settings_download_clean_redundancy">清理下载冗余</string>
-    <string name="settings_download_clean_redundancy_summary">仅清理已登记但已移除下载记录的文件，不处理未知目录。</string>
+    <string name="settings_download_clean_redundancy_summary">清理当前下载目录中不在下载列表内的可识别画廊文件夹。</string>
     <string name="settings_download_clean_redundancy_no_redundancy">未发现冗余</string>
     <string name="settings_download_clean_redundancy_done">完成冗余清理，共清理 %d 项</string>
     <string name="settings_privacy">隐私</string>
@@ -647,4 +647,8 @@
     <string name="settings_compatibility_restore_downloads">恢复下载项（旧版本）</string>
     <string name="settings_compatibility_restore_downloads_summary">迁移旧版本下载目录中的本地文件，暂未开放。</string>
     <string name="settings_compatibility_unavailable">此功能暂未开放</string>
+    <string name="settings_download_restore_report">恢复 %1$d 项，跳过 %2$d 项，失败 %3$d 项。</string>
+    <string name="settings_download_clean_redundancy_report">清理 %1$d 项，跳过 %2$d 项，失败 %3$d 项。</string>
+    <string name="settings_download_maintenance_stopped">请暂停下载并等待其他文件操作完成后重试。</string>
+    <string name="settings_download_clean_redundancy_failed">下载目录不可用或清理失败。</string>
 </resources>

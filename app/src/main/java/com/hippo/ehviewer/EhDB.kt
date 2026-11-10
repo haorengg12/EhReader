@@ -154,6 +154,34 @@ object EhDB {
         }
     }
 
+    /** 恢复下载仅重建当前画廊的业务关系；原有导入标记、分组、旧路径及阅读进度保留。 */
+    @Synchronized
+    fun restoreDownload(info: GalleryInfo, location: DownloadDirname, finished: Int, spiderInfo: ByteArray, startPage: Int) {
+        require(info.gid == location.gid && location.expectedPages > 0 && finished in 0..location.expectedPages)
+        db.runInTransaction {
+            putGalleryMetadata(info)
+            putDownloadLocation(location)
+            val dao = db.downloadsDao()
+            val old = dao.record(info.gid) ?: DownloadRecord(info.gid, time = System.currentTimeMillis())
+            dao.put(
+                old.copy(
+                    state = if (location.phase == "complete") DownloadInfo.STATE_FINISH else DownloadInfo.STATE_NONE,
+                    remainingPages = location.expectedPages - finished,
+                    finishedPages = finished,
+                    attemptedPages = finished,
+                    totalPages = location.expectedPages,
+                ),
+            )
+            val metadata = db.galleryMetadataDao()
+            val reading = metadata.readingState(info.gid)
+            if (reading == null) {
+                metadata.putReadingState(ReadingState(info.gid, startPage.coerceIn(0, location.expectedPages - 1), spiderInfo))
+            } else if (reading.spiderInfo == null) {
+                metadata.putReadingState(reading.copy(spiderInfo = spiderInfo))
+            }
+        }
+    }
+
     @get:Synchronized
     val allDownloadDirname: List<DownloadDirname>
         get() = db.downloadDirnameDao().list()

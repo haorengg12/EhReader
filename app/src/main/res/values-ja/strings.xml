@@ -486,13 +486,13 @@
     <string name="settings_download_download_origin_image_force">常にする</string>
     <string name="settings_download_download_origin_image_only">ダウンロードのみ</string>
     <string name="settings_download_task_confirm">このアクションを実行しても良いですか？</string>
-    <string name="settings_download_restore_download_items">ダウンロードタスクを復元</string>
-    <string name="settings_download_restore_download_items_summary">ダウンロードディレクトリのダウンロードタスクを復元します</string>
+    <string name="settings_download_restore_download_items">ダウンロードを復元</string>
+    <string name="settings_download_restore_download_items_summary">現在のダウンロードフォルダーを確認し、認識できるギャラリーと復元情報を復元します。</string>
     <string name="settings_download_restore_not_found">復元可能なダウンロードが見つかりません</string>
     <string name="settings_download_restore_failed">復元できませんでした</string>
     <string name="settings_download_restore_successfully">%d 件のタスクが復元されました</string>
     <string name="settings_download_clean_redundancy">ダウンロードフォルダの不要なファイルを整理</string>
-    <string name="settings_download_clean_redundancy_summary">ダウンロードディレクトリからダウンロードタスクにない画像ファイルを削除します</string>
+    <string name="settings_download_clean_redundancy_summary">ダウンロード一覧にない、認識できるギャラリーフォルダーを削除します。</string>
     <string name="settings_download_clean_redundancy_no_redundancy">不要なファイルが見つかりませんでした</string>
     <string name="settings_download_clean_redundancy_done">%d 件のファイルを削除しました</string>
     <string name="settings_privacy">プライバシー</string>
@@ -635,4 +635,8 @@
     <string name="settings_compatibility_restore_downloads">ダウンロードを復元（旧バージョン）</string>
     <string name="settings_compatibility_restore_downloads_summary">旧バージョンのローカルダウンロードを移行します。現在は利用できません。</string>
     <string name="settings_compatibility_unavailable">この機能はまだ利用できません。</string>
+    <string name="settings_download_restore_report">復元 %1$d 件、スキップ %2$d 件、失敗 %3$d 件。</string>
+    <string name="settings_download_clean_redundancy_report">削除 %1$d 件、スキップ %2$d 件、失敗 %3$d 件。</string>
+    <string name="settings_download_maintenance_stopped">ダウンロードを一時停止し、他のファイル操作の完了後に再試行してください。</string>
+    <string name="settings_download_clean_redundancy_failed">ダウンロードフォルダーが利用できないか、削除に失敗しました。</string>
 </resources>

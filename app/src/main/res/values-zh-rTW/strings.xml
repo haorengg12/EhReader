@@ -494,13 +494,13 @@
     <string name="settings_download_download_origin_image_force">總是啟用</string>
     <string name="settings_download_download_origin_image_only">僅下載時啟用</string>
     <string name="settings_download_task_confirm">確定要執行操作？</string>
-    <string name="settings_download_restore_download_items">回復下載的檔案</string>
-    <string name="settings_download_restore_download_items_summary">回復下載路徑中的所有下載的檔案</string>
+    <string name="settings_download_restore_download_items">恢復下載項</string>
+    <string name="settings_download_restore_download_items_summary">掃描目前下載目錄，恢復可識別畫廊並補齊恢復資訊。</string>
     <string name="settings_download_restore_not_found">未尋獲可回復的已下載檔案</string>
     <string name="settings_download_restore_failed">回復失敗</string>
     <string name="settings_download_restore_successfully">成功回復 %d 項</string>
     <string name="settings_download_clean_redundancy">清除冗餘的檔案</string>
-    <string name="settings_download_clean_redundancy_summary">清除已下載但不在下載列表中的圖檔</string>
+    <string name="settings_download_clean_redundancy_summary">清理目前下載目錄中不在下載清單內的可識別畫廊資料夾。</string>
     <string name="settings_download_clean_redundancy_no_redundancy">未發現冗餘檔案</string>
     <string name="settings_download_clean_redundancy_done">完成冗餘檔案清理，共清理了 %d 個檔案</string>
     <string name="settings_privacy">隱私</string>
@@ -645,4 +645,8 @@
     <string name="settings_compatibility_restore_downloads">還原下載項目（舊版本）</string>
     <string name="settings_compatibility_restore_downloads_summary">遷移舊版本下載目錄中的本機檔案，尚未開放。</string>
     <string name="settings_compatibility_unavailable">此功能尚未開放</string>
+    <string name="settings_download_restore_report">恢復 %1$d 項，略過 %2$d 項，失敗 %3$d 項。</string>
+    <string name="settings_download_clean_redundancy_report">清理 %1$d 項，略過 %2$d 項，失敗 %3$d 項。</string>
+    <string name="settings_download_maintenance_stopped">請暫停下載並等待其他檔案操作完成後重試。</string>
+    <string name="settings_download_clean_redundancy_failed">下載目錄無法使用或清理失敗。</string>
 </resources>

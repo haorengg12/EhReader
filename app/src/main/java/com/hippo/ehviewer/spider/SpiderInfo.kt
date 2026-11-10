@@ -44,17 +44,37 @@ class SpiderInfo(
     var previewPages: Int = -1,
     var previewPerPage: Int = -1,
     var upgradeFrom: Long? = null,
+    var downloadFormat: String? = null,
 )
 
 private val cbor = Cbor { ignoreUnknownKeys = true }
 
 fun readFromUniFile(file: UniFile): SpiderInfo? = runCatching {
-    file.openInputStream().use { cbor.decodeFromByteArray<SpiderInfo>(it.readBytes()) }
-}.getOrNull() ?: runCatching {
-    file.openInputStream().use { readLegacySpiderInfo(it) }
+    file.openInputStream().use { input ->
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            check(output.size() + count <= 16 * 1024 * 1024) { "Oversized spider info" }
+            output.write(buffer, 0, count)
+        }
+        decodeSpiderInfo(output.toByteArray())
+    }
 }.onFailure {
     Log.e(TAG, "Error", it)
 }.getOrNull()
+
+/** 主库及 .ehreader 共用的续传格式；保留旧编码读取能力，拒绝损坏身份和越界页号。 */
+fun decodeSpiderInfo(bytes: ByteArray): SpiderInfo? {
+    if (bytes.size > 16 * 1024 * 1024) return null
+    val info = runCatching { cbor.decodeFromByteArray<SpiderInfo>(bytes) }.getOrNull()
+        ?: runCatching { bytes.inputStream().use(::readLegacySpiderInfo) }.getOrNull()
+    return info?.takeIf { it.gid > 0 && it.pages > 0 && it.startPage in 0 until it.pages && it.pTokenMap.keys.all { index -> index in 0 until it.pages } }
+        ?.apply { pTokenMap = ConcurrentHashMap(pTokenMap) }
+}
+
+fun SpiderInfo.encodeSpiderInfo(): ByteArray = cbor.encodeToByteArray(this)
 
 fun SpiderInfo.saveToUniFile(file: UniFile) = runSuspendCatching {
     file.openOutputStream().use { it.write(cbor.encodeToByteArray(this@saveToUniFile)) }

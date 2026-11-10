@@ -414,8 +414,14 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         EhDB.putReadingState(galleryInfo.gid, page = page)
     }
 
-    private fun readSpiderInfoFromLocal(): SpiderInfo? = readFromCache(galleryInfo.gid)?.takeIf {
-        it.gid == galleryInfo.gid && it.token == galleryInfo.token
+    private fun readSpiderInfoFromLocal(): SpiderInfo? {
+        fun matches(info: SpiderInfo) = info.gid == galleryInfo.gid && info.token == galleryInfo.token
+        readFromCache(galleryInfo.gid)?.takeIf(::matches)?.let { return it }
+        val restored = DownloadStorage.container(galleryInfo.gid)?.let(DownloadStorage::readRecoveryInfo)?.takeIf(::matches) ?: return null
+        // 主库页码仍是权威值；回填续传快照后，下载准备阶段也能直接使用本地身份。
+        EhDB.getReadingState(galleryInfo.gid)?.let { restored.startPage = it.page.coerceIn(0, restored.pages - 1) }
+        restored.saveToCache()
+        return restored
     }
 
     private suspend fun readSpiderInfoFromInternet(): SpiderInfo? {
@@ -503,6 +509,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     private fun writeSpiderInfoToLocal() {
         if (!isReady) return
         mSpiderInfo.saveToCache()
+        DownloadStorage.saveRecoveryInfo(mSpiderInfo)
     }
 
     private fun isStateDone(state: Int): Boolean = state == STATE_FINISHED || state == STATE_FAILED
@@ -822,7 +829,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         const val STATE_DOWNLOADING = 1
         const val STATE_FINISHED = 2
         const val STATE_FAILED = 3
-        const val SPIDER_INFO_FILENAME = ".ehviewer"
+        const val SPIDER_INFO_FILENAME = ".ehreader"
         const val GET_FULL_HASH = true
         private val sQueenMap = LongSparseArray<SpiderQueen>()
         private val PTOKEN_FAILED_MESSAGE = GetText.getString(R.string.error_get_ptoken_error)
