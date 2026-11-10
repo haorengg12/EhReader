@@ -707,8 +707,7 @@
     <string name="settings_download_save_as_cbz">Save as CBZ archive</string>
     <string name="settings_download_save_as_cbz_summary">Applies to new downloads. Turn off to save numbered images.</string>
     <string name="gallery_detail_local_error">Showing saved gallery information. %1$s</string>
-    <string name="gallery_detail_not_saved">Not saved</string>
-    <string name="gallery_detail_rating_without_count">%1$.2f / 5 (rating count not saved)</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
     <string name="settings_compatibility">Compatibility</string>
     <string name="settings_compatibility_import_legacy">Import legacy EhViewer data</string>
     <string name="settings_compatibility_import_legacy_summary">Import data from an older EhViewer version. Not available yet.</string>

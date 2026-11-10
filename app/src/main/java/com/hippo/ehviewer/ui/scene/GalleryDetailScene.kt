@@ -844,18 +844,17 @@ class GalleryDetailScene :
             return
         }
         val resources = resources
+        val local = mLocalMetadata
         mThumb!!.load(getThumbKey(gd.gid), com.hippo.ehviewer.spider.DownloadInfoMagics.encodeMagicRequest(DownloadInfo(gd)), false, hardware = false)
         mTitle!!.text = EhUtils.getSuitableTitle(gd)
         mUploader!!.text = gd.uploader
         mUploader!!.alpha = if (gd.disowned) .5f else 1f
-        mCategory!!.text = EhUtils.getCategory(gd.category)
+        mCategory!!.text = if (local != null && local.category == null) null else EhUtils.getCategory(gd.category)
         mCategory!!.setTextColor(EhUtils.getCategoryColor(gd.category))
         updateDownloadText()
-        val local = mLocalMetadata
-        val missing = getString(R.string.gallery_detail_not_saved)
-        mLanguage!!.text = gd.language ?: local?.simpleLanguage ?: if (local != null) missing else null
+        mLanguage!!.text = gd.language ?: local?.simpleLanguage
         mPages!!.text = if (local != null && local.pages == null) {
-            missing
+            null
         } else {
             resources.getQuantityString(
                 R.plurals.page_count,
@@ -863,12 +862,12 @@ class GalleryDetailScene :
                 gd.pages,
             )
         }
-        mSize!!.text = gd.size ?: if (local != null) missing else null
-        mPosted!!.text = gd.posted ?: if (local != null) missing else null
-        mFavoredTimes!!.text = if (local != null && local.favoriteCount == null) missing else resources.getString(R.string.favored_times, gd.favoriteCount)
+        mSize!!.text = gd.size
+        mPosted!!.text = gd.posted
+        mFavoredTimes!!.text = if (local != null && local.favoriteCount == null) null else resources.getString(R.string.favored_times, gd.favoriteCount)
         mNewerVersion!!.visibility = if (gd.newerVersions.isNotEmpty()) View.VISIBLE else View.GONE
         mRatingText!!.text = when {
-            !gd.rating.isFinite() -> missing
+            !gd.rating.isFinite() -> null
             local != null && local.ratingCount == null -> getString(R.string.gallery_detail_rating_without_count, gd.rating)
             else -> getAllRatingText(gd.rating, gd.ratingCount)
         }
@@ -876,7 +875,7 @@ class GalleryDetailScene :
         updateFavoriteDrawable()
         mTorrent!!.text = if (local != null && local.torrentCount == null) getString(R.string.torrents) else resources.getString(R.string.torrent_count, gd.torrentCount)
         bindTags(gd.tags)
-        if (local != null && local.tags == null) mNoTags?.text = missing
+        if (local != null && local.tags == null) mNoTags?.text = null
         bindComments(gd.comments?.comments)
         bindPreviews(gd)
         mComments?.visibility = if (Settings.showComments && (local == null || gd.comments != null)) View.VISIBLE else View.GONE

@@ -264,3 +264,9 @@
 - **内容** 恢复“设置 → 下载 → 恢复下载项”名称，按新版分类/GID 扫描恢复缺失下载和实际位置，校验 CBZ/散图、恢复暂停任务并补齐 .ehreader 续传身份文件；正常下载准备/完成/关闭也保存该文件，主库续传缺失时可读回，主库页码优先。恢复事务保留原分组、时间、旧路径、旧库导入标记及阅读状态。冗余清理扩展到当前根可确认归属的未登记画廊，删除完整 GID 目录及缓存，保护现有下载、读者、未知内容、其他根及关系数据，逐项报告失败。旧版平铺目录仍留给预留兼容性功能。
 - **文件** EhDB.kt、download/DownloadStorage、DownloadMaintenance、GalleryMaintenance、GalleryRecoveryFile，两项设置 Preference、spider/SpiderInfo/SpiderQueen，五组 strings.xml、两份新增测试、需求文档和本记录；工作区[数据库总览](../../../EhReader数据库表结构与关系一览.md)同步说明侧文件/恢复语义。实际 schema 2 与导出一致，无表/列/外键变更；[本次文件清单](../../../temp/2026-11-11-download-maintenance/commit-files.json)。
 - **结果** 最终 Spotless、Kotlin 编译、47 项单元测试、55 项 Node 测试、lintDebug 和 ARM64 Debug 打包/包校验通过；lint 0 错误/222 警告，新增 2 条为保留的旧成功提示资源未使用。迭代中的格式问题已修正；出现过 KSP 初始化异常，单项诊断和最终完整构建通过，具体根因未确认，未清缓存或升级工具链。用户后续明确要求测试包，沿用 1.8.15.1 / 10816；全部名称、包名/架构、原生源码、签名及对齐通过，证书与上一包相同。实际构建副本与宿主 629 份源文件一致，设备/SAF 交互未执行。按持续授权本地提交 develop，不创建 Tag、不推送；[测试包与材料](../../../release/20261111-003700-download-maintenance-debug/)、[验收报告](../../../temp/2026-11-11-download-maintenance/review.md)，提交后 SHA 仅留外部证据。
+
+## 2026-11-11 元数据空值留白（不打包）
+
+- **内容** 详情页和画廊信息列表的缺失元数据留空，移除“未保存”和评分人数缺失说明；已有分数、0/false 等有效值保留，未记录的本地分类/账号快照不填默认值。删除未使用的占位资源，同步需求说明；数据库与下载业务逻辑不变。
+- **文件** ui/scene/GalleryDetailScene.kt、GalleryInfoScene.kt，默认/简中/繁中（台湾、香港）/日语 strings.xml，.agents/docs/GALLERY_DOWNLOAD_LAYOUT.md 和本记录；[本次源码清单](../../../temp/2026-11-11-empty-metadata/task-code-files.json)。
+- **结果** Spotless、KSP、Kotlin 编译、47 项既有单元测试、lintDebug 及文档/编码/差异检查通过；lint 0 错误/222 警告。629 份源文件与实际检查副本一致，设备界面未验证，未新增 UI 测试；未修改 Node 脚本或数据库结构。未打包，既有 APK 散列不变，版本保持 1.8.15.1 / 10816；按持续授权本地提交 develop，不创建 Tag、不推送。详见[检查报告](../../../temp/2026-11-11-empty-metadata/review.md)，提交后 SHA 仅留外部证据。

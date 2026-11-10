@@ -639,8 +639,7 @@
     <string name="settings_download_save_as_cbz">保存为CBZ压缩包</string>
     <string name="settings_download_save_as_cbz_summary">仅对新下载生效，关闭后保存编号散图。</string>
     <string name="gallery_detail_local_error">正在显示本地保存的画廊信息。%1$s</string>
-    <string name="gallery_detail_not_saved">未保存</string>
-    <string name="gallery_detail_rating_without_count">%1$.2f / 5（评分人数未保存）</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
     <string name="settings_compatibility">兼容性</string>
     <string name="settings_compatibility_import_legacy">导入旧版本EhViewer数据</string>
     <string name="settings_compatibility_import_legacy_summary">导入旧版本 EhViewer 的数据，暂未开放。</string>

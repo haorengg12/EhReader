@@ -637,8 +637,7 @@
         <item quantity="other">年</item>
     </plurals>
     <string name="gallery_detail_local_error">正在顯示本機儲存的畫廊資訊。%1$s</string>
-    <string name="gallery_detail_not_saved">未儲存</string>
-    <string name="gallery_detail_rating_without_count">%1$.2f / 5（評分人數未儲存）</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
     <string name="settings_compatibility">相容性</string>
     <string name="settings_compatibility_import_legacy">匯入舊版本EhViewer資料</string>
     <string name="settings_compatibility_import_legacy_summary">匯入舊版本 EhViewer 的資料，尚未開放。</string>
