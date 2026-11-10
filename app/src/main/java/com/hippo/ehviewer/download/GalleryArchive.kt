@@ -6,30 +6,41 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 /** 归档只接受连续编号图片；校验页序、重复项、CRC 与内容散列，不提取任意归档路径。 */
 object GalleryArchive {
-    /** 已核验的本地成品按条目随机读取，避免每次翻页从归档首部扫描。 */
-    fun copyPage(zip: ZipFile, name: String, output: OutputStream, expectedDigest: String): Boolean {
-        check(DownloadLayout.pagePattern.matches(name))
-        val entry = zip.getEntry(name) ?: return false
-        val digest = MessageDigest.getInstance("SHA-256")
-        zip.getInputStream(entry).use { input ->
-            output.use { target ->
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    target.write(buffer, 0, count)
-                    digest.update(buffer, 0, count)
+    /** 直接读取授权 URI 提供的流，不重开 /proc 文件描述符路径；输出交给调用方管理。 */
+    fun copyPage(input: InputStream, name: String, output: OutputStream, expectedDigest: String): Boolean {
+        require(DownloadLayout.pagePattern.matches(name) && expectedDigest.matches(Regex("[0-9a-f]{64}")))
+        return ZipInputStream(input.buffered()).use { zip ->
+            var page = 1
+            while (true) {
+                val entry = zip.nextEntry ?: return false
+                check(!entry.isDirectory && DownloadLayout.pagePattern.matches(entry.name) && entry.name.substringBefore('.').toInt() == page) { "Invalid archive page order" }
+                if (page == name.substringBefore('.').toInt()) {
+                    check(entry.name == name) { "Archive page name mismatch" }
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    val buffer = ByteArray(8192)
+                    var length = 0L
+                    while (true) {
+                        val count = zip.read(buffer)
+                        if (count < 0) break
+                        output.write(buffer, 0, count)
+                        digest.update(buffer, 0, count)
+                        length += count
+                    }
+                    zip.closeEntry()
+                    check(length > 0 && digest.digest().joinToString("") { "%02x".format(it) } == expectedDigest) { "Archive page digest mismatch" }
+                    return true
                 }
+                zip.closeEntry()
+                page++
             }
+            @Suppress("UNREACHABLE_CODE")
+            false
         }
-        check(digest.digest().joinToString("") { "%02x".format(it) } == expectedDigest) { "Archive page digest mismatch" }
-        return true
     }
 
     fun write(names: List<String>, output: OutputStream, input: (String) -> InputStream) {

@@ -804,7 +804,15 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
             private suspend fun doInJob(index: Int) {
                 mFetcherJobMap[index]?.takeIf { it.isActive }?.join()
-                val src = mSpiderDen.getImageSource(index) ?: return
+                val src = try {
+                    mSpiderDen.getImageSource(index) ?: return
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(TAG, "Cannot read gallery page", error)
+                    notifyGetImageFailure(index, READ_ERROR)
+                    return
+                }
                 val image = mSemaphore.withPermit { Image.decode(src) }
                 runCatching {
                     currentCoroutineContext().ensureActive()
@@ -835,6 +843,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         private val PTOKEN_FAILED_MESSAGE = GetText.getString(R.string.error_get_ptoken_error)
         private val ERROR_TIMEOUT = GetText.getString(R.string.error_timeout)
         private val DECODE_ERROR = GetText.getString(R.string.error_decoding_failed)
+        private val READ_ERROR = GetText.getString(R.string.error_reading_failed)
         private val URL_509_PATTERN = Regex("\\.org/.+/509s?\\.gif")
         private const val FORCE_RETRY = "Force retry"
         private const val WORKER_DEBUG_TAG = "SpiderQueenWorker"

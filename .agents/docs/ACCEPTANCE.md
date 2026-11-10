@@ -270,3 +270,9 @@
 - **内容** 详情页和画廊信息列表的缺失元数据留空，移除“未保存”和评分人数缺失说明；已有分数、0/false 等有效值保留，未记录的本地分类/账号快照不填默认值。删除未使用的占位资源，同步需求说明；数据库与下载业务逻辑不变。
 - **文件** ui/scene/GalleryDetailScene.kt、GalleryInfoScene.kt，默认/简中/繁中（台湾、香港）/日语 strings.xml，.agents/docs/GALLERY_DOWNLOAD_LAYOUT.md 和本记录；[本次源码清单](../../../temp/2026-11-11-empty-metadata/task-code-files.json)。
 - **结果** Spotless、KSP、Kotlin 编译、47 项既有单元测试、lintDebug 及文档/编码/差异检查通过；lint 0 错误/222 警告。629 份源文件与实际检查副本一致，设备界面未验证，未新增 UI 测试；未修改 Node 脚本或数据库结构。未打包，既有 APK 散列不变，版本保持 1.8.15.1 / 10816；按持续授权本地提交 develop，不创建 Tag、不推送。详见[检查报告](../../../temp/2026-11-11-empty-metadata/review.md)，提交后 SHA 仅留外部证据。
+
+## 2026-11-11 下载完成 CBZ 读取权限崩溃修复（不打包）
+
+- **内容** 用户四份崩溃日志均定位到 ZipFile 重开 /proc/self/fd 路径被系统 EACCES 拒绝；改为通过已授权 URI 输入流读取 CBZ，保留页名/序号、CRC 和主库摘要校验，以及下载根 temp_read/GID 缓存。图片源读取异常记录原因并通知页面读取失败，避免普通 I/O 异常未捕获导致崩溃，取消仍传播；不修改归档、下载完成状态或数据库。
+- **文件** download/DownloadStorage.kt、GalleryArchive.kt，spider/SpiderQueen.kt，GalleryStorageTest.kt、GalleryArchiveStreamTest.kt，需求说明与本记录；[本次源码清单](../../../temp/2026-11-11-gallery-open-crash/task-code-files.json)。原始日志只留工作区 temp，未加入仓库。
+- **结果** Spotless、KSP、Kotlin 编译、51 项单元测试、lintDebug 及文档/编码/差异检查通过，lint 0 错误/222 警告；新增 4 项流兼容、校验、缓存及失败重试回归，630 份源文件与检查副本一致。没有原始 CBZ 或设备连接，Android provider/权限和页面交互尚未复测；首次未缓存页的流式查找需扫描前序条目。本次未打包，已有 APK 散列一致，版本仍 1.8.15.1 / 10816；按持续授权本地提交 develop，不创建 Tag、不推送。详见[日志分析与检查报告](../../../temp/2026-11-11-gallery-open-crash/review.md)，提交后 SHA 仅留外部证据。

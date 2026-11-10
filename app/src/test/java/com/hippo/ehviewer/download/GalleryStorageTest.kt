@@ -5,9 +5,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.OutputStream
-import java.nio.file.Files
 import java.util.zip.ZipEntry
-import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -90,19 +88,12 @@ class GalleryStorageTest {
     }
 
     @Test
-    fun randomAccessReaderChecksThePersistedPageDigest() {
+    fun streamReaderChecksThePersistedPageDigest() {
         val content = byteArrayOf(1, 2, 3)
-        val file = Files.createTempFile("ehreader-cbz-", ".cbz").toFile()
-        try {
-            file.writeBytes(archive(mapOf("00000001.jpg" to content)))
-            ZipFile(file).use { zip ->
-                val output = ByteArrayOutputStream()
-                assertTrue(GalleryArchive.copyPage(zip, "00000001.jpg", output, GalleryArchive.digest(ByteArrayInputStream(content))))
-                assertTrue(content.contentEquals(output.toByteArray()))
-                assertThrows(IllegalStateException::class.java) { GalleryArchive.copyPage(zip, "00000001.jpg", ByteArrayOutputStream(), "incorrect") }
-            }
-        } finally {
-            file.delete()
-        }
+        val bytes = archive(mapOf("00000001.jpg" to content))
+        val output = ByteArrayOutputStream()
+        assertTrue(GalleryArchive.copyPage(bytes.inputStream(), "00000001.jpg", output, GalleryArchive.digest(content.inputStream())))
+        assertTrue(content.contentEquals(output.toByteArray()))
+        assertThrows(IllegalStateException::class.java) { GalleryArchive.copyPage(bytes.inputStream(), "00000001.jpg", ByteArrayOutputStream(), "0".repeat(64)) }
     }
 }

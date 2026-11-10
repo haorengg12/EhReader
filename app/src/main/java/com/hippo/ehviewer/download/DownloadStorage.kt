@@ -64,10 +64,8 @@ object DownloadStorage {
         val archive = archive(gid) ?: throw java.io.IOException("Missing completed archive")
         return (
             readCache.page(root, gid, name, item.substringAfter(':')) { output ->
-                archive.openFileDescriptor("r").use { descriptor ->
-                    java.util.zip.ZipFile("/proc/self/fd/${descriptor.fd}").use { zip ->
-                        check(GalleryArchive.copyPage(zip, name, output, item.substringAfter(':'))) { "Missing archive page" }
-                    }
+                archive.openInputStream().use { input ->
+                    check(GalleryArchive.copyPage(input, name, output, item.substringAfter(':'))) { "Missing archive page" }
                 }
             } as StorageFile
             ).file
