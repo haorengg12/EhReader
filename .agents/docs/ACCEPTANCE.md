@@ -276,3 +276,9 @@
 - **内容** 用户四份崩溃日志均定位到 ZipFile 重开 /proc/self/fd 路径被系统 EACCES 拒绝；改为通过已授权 URI 输入流读取 CBZ，保留页名/序号、CRC 和主库摘要校验，以及下载根 temp_read/GID 缓存。图片源读取异常记录原因并通知页面读取失败，避免普通 I/O 异常未捕获导致崩溃，取消仍传播；不修改归档、下载完成状态或数据库。
 - **文件** download/DownloadStorage.kt、GalleryArchive.kt，spider/SpiderQueen.kt，GalleryStorageTest.kt、GalleryArchiveStreamTest.kt，需求说明与本记录；[本次源码清单](../../../temp/2026-11-11-gallery-open-crash/task-code-files.json)。原始日志只留工作区 temp，未加入仓库。
 - **结果** Spotless、KSP、Kotlin 编译、51 项单元测试、lintDebug 及文档/编码/差异检查通过，lint 0 错误/222 警告；新增 4 项流兼容、校验、缓存及失败重试回归，630 份源文件与检查副本一致。没有原始 CBZ 或设备连接，Android provider/权限和页面交互尚未复测；首次未缓存页的流式查找需扫描前序条目。本次未打包，已有 APK 散列一致，版本仍 1.8.15.1 / 10816；按持续授权本地提交 develop，不创建 Tag、不推送。详见[日志分析与检查报告](../../../temp/2026-11-11-gallery-open-crash/review.md)，提交后 SHA 仅留外部证据。
+
+## 2026-11-11 1.8.15.2 ARM64 Debug 测试包
+
+- **内容** 按用户明确要求升为 1.8.15.2 / 10817，生成包含已提交元数据空值留白与 CBZ 流式读取权限崩溃修复的 ARM64 Debug 测试包；应用数据库结构和功能逻辑不变。
+- **文件** app/build.gradle.kts、.agents/docs/GALLERY_DOWNLOAD_LAYOUT.md 与本记录；[最终审核单](../../../temp/2026-11-11-debug-1.8.15.2/review.md)。
+- **结果** Docker 完整构建通过，Spotless、KSP、Kotlin 编译、51 项单元测试、55 项 Node 测试及 lintDebug 通过，lint 0 错误/222 警告。实际包名、五组语言名称、1.8.15.2 / 10817、仅 arm64-v8a、Nettle 源码隔离、签名及 16KB 对齐核验通过，调试证书与上一包一致。本次 KSP 正常，构建前后 693 份宿主文件及容器输入散列一致，无源码替换。设备和原始 CBZ/SAF 交互待用户复测，未将构建成功视为设备通过；按持续授权提交本地 develop，不创建 Tag、不推送。[交付目录](../../../release/20261111-230216-debug-1.8.15.2/)、[验收报告](../../../release/20261111-230216-debug-1.8.15.2/验收报告.md)，构建基线及完整源码快照已留证，提交后 SHA 只留外部清单。
