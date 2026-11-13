@@ -62,6 +62,12 @@ export function validateCandidateVersion(current, history, sha, tagExists) {
     validateOfficialVersion(current, history);
 }
 
+/** PR 基准及实际合并的第一父提交都必须走第一位路径，不能把第二位当发行。 */
+export function validateReleaseTransition(previous, current) {
+    assert.equal(current.name.split('.').length, 3, 'Official releases require three components');
+    assert.equal(versionPath(previous, current), 'official', 'Only major changes may enter official release');
+}
+
 /** 相同版本仅允许相同提交恢复；新版本必须严格大于已发布序列。 */
 export function validateHistory(current, history, sha) {
     for (const old of history) {
@@ -126,12 +132,10 @@ function inspect({ candidate = false } = {}) {
     const existing = all.find(r => r.tag_name === version.tag);
     if (existing) assert(tagExists, 'Existing release without expected tag');
     if (!existing || existing.draft) {
-        if (candidate) {
-            const base = event.pull_request.base.sha;
-            assert.match(base || '', /^[a-f0-9]{40}$/, 'Fixed PR base SHA is required');
-            git('merge-base', '--is-ancestor', base, sha);
-            assert.equal(versionPath(parseVersion(git('show', `${base}:app/build.gradle.kts`)), version), 'official', 'Only major/minor changes may enter official release');
-        }
+        const base = candidate ? event.pull_request.base.sha : git('rev-parse', `${sha}^1`);
+        assert.match(base || '', /^[a-f0-9]{40}$/, 'Fixed PR or merge-parent base SHA is required');
+        git('merge-base', '--is-ancestor', base, sha);
+        validateReleaseTransition(parseAppVersion(git('show', `${base}:app/build.gradle.kts`)), version);
         validateOfficialVersion(version, history);
     }
     const previous = history.filter(r => r.tag !== version.tag && r.formal).sort((a, b) => b.code - a.code)[0];

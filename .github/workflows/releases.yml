@@ -1,6 +1,6 @@
 name: EhReader Release
 
-# 不接受 push/tag/manual 事件；只接受同仓库 develop PR 已合并到 master。
+# 仅第一位升版正式发行；只接受同仓库 develop PR 合并到 master，固定实际 merge SHA。
 on:
   pull_request:
     types: [closed]

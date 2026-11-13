@@ -282,3 +282,9 @@
 - **内容** 按用户明确要求升为 1.8.15.2 / 10817，生成包含已提交元数据空值留白与 CBZ 流式读取权限崩溃修复的 ARM64 Debug 测试包；应用数据库结构和功能逻辑不变。
 - **文件** app/build.gradle.kts、.agents/docs/GALLERY_DOWNLOAD_LAYOUT.md 与本记录；[最终审核单](../../../temp/2026-11-11-debug-1.8.15.2/review.md)。
 - **结果** Docker 完整构建通过，Spotless、KSP、Kotlin 编译、51 项单元测试、55 项 Node 测试及 lintDebug 通过，lint 0 错误/222 警告。实际包名、五组语言名称、1.8.15.2 / 10817、仅 arm64-v8a、Nettle 源码隔离、签名及 16KB 对齐核验通过，调试证书与上一包一致。本次 KSP 正常，构建前后 693 份宿主文件及容器输入散列一致，无源码替换。设备和原始 CBZ/SAF 交互待用户复测，未将构建成功视为设备通过；按持续授权提交本地 develop，不创建 Tag、不推送。[交付目录](../../../release/20261111-230216-debug-1.8.15.2/)、[验收报告](../../../release/20261111-230216-debug-1.8.15.2/验收报告.md)，构建基线及完整源码快照已留证，提交后 SHA 只留外部清单。
+
+## 2026-11-14 四位版本与上传分流调整
+
+- **内容**：按用户确认采用四位逻辑版本及最左变化位优先；第一位在确认版本并明确上传后由助手跟踪 CI、创建 PR 并自动 Merge commit 后发行，无需二次确认；第二位只构建汇报，第三位只推新 UUID 临时分支且没有远端 CI，第四位仅本地 Debug。上传须准备递增三段版本，versionCode 保持独立递增；当前 1.8.15.2 / 10817 不变。
+- **文件**：仓库 AGENTS.md、开发/仓库/发布/本地/测试规范、流程图及规范索引；scripts/version-policy.mjs、ci.mjs、ci.test.mjs、upload-plan.mjs、release.mjs、release.test.mjs；三份 CI/发行 workflow 和本记录。工作区根 AGENTS.md 在仓库外同步；[检查报告](../../../temp/2026-11-14-version-routing/review.md)。
+- **结果**：53 项 Node 测试通过（含真实 Git CLI、升位优先级、UUID 分支计划、四段上传拒绝及第一位发行门禁）；工作区文档/链接、脚本及 workflow 编码、差异检查通过。actionlint 原始输出仅既有两处 queue 字段工具兼容诊断，仅排除这两项后无其他问题，不称原始检查完全通过。本次不改应用业务或构建配置，未额外编译 APK；设备测试与远端分流/正式发布未执行。按持续授权仅本地 develop 提交，不推送、不创建 Tag/Release，提交后 SHA 留 temp 证据。

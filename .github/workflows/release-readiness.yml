@@ -22,7 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Check unused release version and signing availability
+      - name: Check major release version and signing availability
         env:
           GH_TOKEN: ${{ github.token }}
           SIGNING_CONFIGURED: ${{ secrets.EHREADER_KEYSTORE_BASE64 != '' && secrets.EHREADER_STORE_PASSWORD != '' && secrets.EHREADER_KEY_ALIAS != '' && secrets.EHREADER_KEY_PASSWORD != '' }}

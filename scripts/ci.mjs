@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseAppVersion, versionPath } from './version-policy.mjs';
+import { parseAppVersion, versionPath, validateUploadVersion } from './version-policy.mjs';
 
 export const REPOSITORY = 'haorengg12/EhReader';
 const shaPattern = /^[a-f0-9]{40}$/;
@@ -18,6 +18,7 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
     assert.equal(event.repository?.full_name, REPOSITORY);
     validSha(sha);
     const current = parseAppVersion(readVersion(sha));
+    validateUploadVersion(current);
     const result = { sha, version: current.name, code: current.code, tag: current.tag, path: 'quality-only', debug: false, base: '' };
     if (eventName === 'pull_request') {
         assert(['opened', 'synchronize', 'reopened', 'ready_for_review', 'edited'].includes(event.action));
@@ -28,10 +29,7 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
     }
     assert(['push', 'workflow_dispatch'].includes(eventName), 'Unsupported CI event');
     const ref = event.ref;
-    assert(ref === 'refs/heads/develop' || ref?.startsWith('refs/heads/brody-'), 'Only develop and brody branches may use this entry');
-    const development = ref === 'refs/heads/develop';
-    if (!development) assert.equal(current.name.split('.').length, 4, 'Version shape does not match branch');
-    if (!development) assert.equal(ref, `refs/heads/brody-${current.name}`, 'Snapshot branch/version mismatch');
+    assert.equal(ref, 'refs/heads/develop', 'Only develop may use this entry; snapshot branches have no CI');
     if (eventName === 'push') {
         assert(!event.deleted, 'Deleted branches cannot build');
         assert.equal(event.after, sha);
@@ -39,7 +37,6 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
         result.base = event.before;
     } else {
         const repair = event.inputs?.repair_debug === true || event.inputs?.repair_debug === 'true';
-        assert(!repair || development, 'Debug repair is restricted to develop');
         if (!repair && !event.inputs?.base_sha) return result;
         validSha(event.inputs?.base_sha);
         result.base = event.inputs.base_sha;
@@ -47,42 +44,14 @@ export function planCI({ event, eventName, sha, repository, readVersion, isAnces
     assert(isAncestor(result.base, sha), 'Base SHA must be an ancestor of checked source');
     const previous = parseAppVersion(readVersion(result.base));
     result.path = versionPath(previous, current);
-    if (!development) {
-        assert(['testing', 'save'].includes(result.path), 'Version path does not match branch');
-        // 历史 brody 分支继续只读基础检查，新测试版在 develop 构建。
-        if (result.path === 'testing') result.path = 'snapshot';
-    }
-    result.debug = development && ['development', 'testing'].includes(result.path);
+    assert(['save', 'official', 'build'].includes(result.path), 'Third component must be uploaded to a develop-UUID snapshot branch');
+    result.debug = ['official', 'build'].includes(result.path);
     if (eventName === 'workflow_dispatch') {
         const repair = event.inputs?.repair_debug === true || event.inputs?.repair_debug === 'true';
-        if (repair) assert(['development', 'testing'].includes(result.path), 'Repair must use the original pre-version-change base');
+        if (repair) assert(['official', 'build'].includes(result.path), 'Repair must use the original pre-version-change base');
         result.debug = repair;
     }
     return result;
-}
-
-/** 原子创建开发 Tag；并发冲突只允许同 SHA 幂等，不移动 Tag、不创建 Release。 */
-export async function ensureDevelopmentTag({ plan, findTag, createTag }) {
-    assert(plan.debug && plan.path === 'development');
-    const old = await findTag(plan.tag);
-    if (old) { assert.equal(old, plan.sha, 'Development tag already belongs to another SHA; raise a new version'); return 'existing'; }
-    try { await createTag(plan.tag, plan.sha); }
-    catch (error) { assert.equal(await findTag(plan.tag), plan.sha, 'Concurrent tag conflict; no tag was overwritten'); return 'existing'; }
-    return 'created';
-}
-
-function api(endpoint, method = 'GET', data) {
-    const response = JSON.parse(execFileSync('gh', ['api', `repos/${REPOSITORY}/${endpoint}`, '--method', method, ...(data ? ['--input', '-'] : [])], { encoding: 'utf8', ...(data ? { input: JSON.stringify(data) } : {}) }));
-    return response;
-}
-
-function remoteTag(tag) {
-    let object;
-    try { object = api(`git/ref/tags/${tag}`).object; }
-    catch (error) { if (/HTTP 404/.test(String(error.stderr))) return undefined; throw error; }
-    for (let i = 0; i < 8 && object.type === 'tag'; i++) object = api(`git/tags/${object.sha}`).object;
-    assert.equal(object.type, 'commit', 'Unresolvable tag target');
-    return object.sha;
 }
 
 function fromEnvironment() {
@@ -101,19 +70,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const action = process.argv[2];
     const plan = fromEnvironment();
     if (action === 'plan') {
-        if (plan.debug && plan.path === 'development') {
-            const target = remoteTag(plan.tag);
-            assert(!target || target === plan.sha, 'Existing development tag requires a new version for repaired source');
-        }
         if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, Object.entries(plan).map(([key, value]) => `${key}=${value}`).join('\n') + '\n');
         console.log(JSON.stringify(plan, null, 2));
         if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Basic quality: ${plan.sha}\nVersion: ${plan.version} (${plan.code})\nPath: ${plan.path}; Debug: ${plan.debug}\nBase: ${plan.base || 'not used'}\n`);
-    } else if (action === 'tag') {
-        assert.notEqual(process.env.GITHUB_EVENT_NAME, 'pull_request');
-        assert.equal(process.env.QUALITY_RESULT, 'success');
-        assert.equal(process.env.DEBUG_RESULT, 'success', 'Tag requires this SHA Debug build and package checks');
-        const status = await ensureDevelopmentTag({ plan, findTag: remoteTag, createTag: (tag, sha) => api('git/refs', 'POST', { ref: `refs/tags/${tag}`, sha }) });
-        console.log(`${status}: ${plan.tag} -> ${plan.sha}; no Release created`);
-        if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Development tag ${status}: ${plan.tag}\nSource: ${plan.sha}\nDebug and package checks: success\nNo Release created.\n`);
-    } else throw new Error('Expected plan or tag');
+    } else throw new Error('Expected plan; development tags are disabled');
 }

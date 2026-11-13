@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseVersion, validateEvent, validateHistory, validateCandidateEvent, validateCandidateVersion, releaseBody, REPO } from './release.mjs';
+import { parseVersion, validateEvent, validateHistory, validateCandidateEvent, validateCandidateVersion, validateReleaseTransition, releaseBody, REPO } from './release.mjs';
 const sha = 'a'.repeat(40);
 const event = () => ({ action: 'closed', number: 4, repository: { full_name: REPO }, pull_request: {
     merged: true, merge_commit_sha: sha,
     head: { ref: 'develop', repo: { full_name: REPO } }, base: { ref: 'master', repo: { full_name: REPO } },
 } });
+test('PR and merge-parent transition require a major bump, including legacy four-component bases', () => {
+    const old = { name: '1.8.15.2', code: 10817 };
+    validateReleaseTransition(old, { name: '2.9.16', code: 10818 });
+    for (const name of ['1.9.16', '1.8.16']) {
+        assert.throws(() => validateReleaseTransition(old, { name, code: 10818 }), /Only major/);
+    }
+    assert.throws(() => validateReleaseTransition(old, { name: '2.9.16.1', code: 10818 }), /three components/);
+});
 test('only same-repository develop merge can publish exact merge SHA', () => {
     validateEvent(event(), 'pull_request', sha);
     for (const change of [e => e.pull_request.merged = false, e => e.pull_request.head.ref = 'feature/test',
@@ -43,13 +51,13 @@ test('PR readiness checks exact same-repository develop head without allowing pu
 });
 test('PR readiness rejects published versions, orphan tags and non-increasing version codes', () => {
     const old = { name: '0.1.1', code: 101, tag: 'v0.1.1', sha };
-    const next = { name: '0.2.0', code: 102, tag: 'v0.2.0' };
+    const next = { name: '1.2.3', code: 102, tag: 'v1.2.3' };
     validateCandidateVersion(next, [old], sha, false);
     assert.throws(() => validateCandidateVersion(old, [old], sha, true), /Update versionName and versionCode/);
     assert.throws(() => validateCandidateVersion(old, [old], sha, false), /already exists/);
     assert.throws(() => validateCandidateVersion(next, [old], sha, true), /already exists/);
     assert.throws(() => validateCandidateVersion({ ...next, code: 101 }, [old], sha, false), /versionCode must exceed/);
-    assert.throws(() => validateCandidateVersion({ name: '0.1.2', code: 102, tag: 'v0.1.2' }, [old], sha, false), /major or minor/);
+    assert.throws(() => validateCandidateVersion({ name: '0.1.2', code: 102, tag: 'v0.1.2' }, [old], sha, false), /major component/);
 });
 test('published history prevents version reuse, downgrade and moved tags', () => {
     const old = { name: '0.1.0', code: 100, tag: 'v0.1.0', sha };
