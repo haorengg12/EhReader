@@ -288,3 +288,9 @@
 - **内容**：按用户确认采用四位逻辑版本及最左变化位优先；第一位在确认版本并明确上传后由助手跟踪 CI、创建 PR 并自动 Merge commit 后发行，无需二次确认；第二位只构建汇报，第三位只推新 UUID 临时分支且没有远端 CI，第四位仅本地 Debug。上传须准备递增三段版本，versionCode 保持独立递增；当前 1.8.15.2 / 10817 不变。
 - **文件**：仓库 AGENTS.md、开发/仓库/发布/本地/测试规范、流程图及规范索引；scripts/version-policy.mjs、ci.mjs、ci.test.mjs、upload-plan.mjs、release.mjs、release.test.mjs；三份 CI/发行 workflow 和本记录。工作区根 AGENTS.md 在仓库外同步；[检查报告](../../../temp/2026-11-14-version-routing/review.md)。
 - **结果**：53 项 Node 测试通过（含真实 Git CLI、升位优先级、UUID 分支计划、四段上传拒绝及第一位发行门禁）；工作区文档/链接、脚本及 workflow 编码、差异检查通过。actionlint 原始输出仅既有两处 queue 字段工具兼容诊断，仅排除这两项后无其他问题，不称原始检查完全通过。本次不改应用业务或构建配置，未额外编译 APK；设备测试与远端分流/正式发布未执行。按持续授权仅本地 develop 提交，不推送、不创建 Tag/Release，提交后 SHA 留 temp 证据。
+
+## 2026-11-14 1.8.16 第三位快照推送验证
+
+- **内容**：按用户要求仅将版本提升为 1.8.16 / 10818，验证第三位升版的新 UUID 快照分支路径；不新增业务编码，跳过用户开发包验证。
+- **文件**：app/build.gradle.kts 与本记录；[最终审核单和证据目录](../../../temp/2026-11-14-upload-1.8.16/review.md)。上传范围包括本地 develop 此前 7 个尚未上传提交及本次升版提交。
+- **结果**：53 项 Node 测试、工作区文档/链接、版本文件编码及差异检查通过；已 fetch 并固定 origin/develop 基准 0a5c56ce143f97d5ec9aaf36afdd3bcd3c3163fd（1.8.15 / 10815），目标相对基准及本地 1.8.15.2 / 10817 均合法递增。未运行本地 Android 编译、Spotless、lint、APK 或设备验证；本次仅验证版本快照流程，不将静态检查视为打包通过。提交后按授权推送新的 develop-六位UUID 分支并核对完整 SHA，远端结果待执行并留存工作区 temp；按第三位规则不运行 CI、不创建 PR/Tag/Release、不合并 master。
