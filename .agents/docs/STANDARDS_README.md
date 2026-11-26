@@ -1,12 +1,12 @@
 # EhReader 开发规范 V3.1
 
-更新日期：2026-11-14。当前规范采用 master 默认分支、develop 开发分支，以及按阶段读取规范的执行方式。
+更新日期：2026-11-18。当前规范采用 master 默认分支、develop 开发分支，以及按阶段读取规范的执行方式。
 
 ## 如何使用
 
 开始只读[工作区入口](../../../AGENTS.md)、[EhReader AI 入口](../../AGENTS.md)和[开发任务流程](DEVELOPMENT_FLOW.md)。进入阶段时再读取流程表中的规范，不要求开工时读完所有文件；已读且未变化的内容复用。
 
-本规范目录是工作区 `.agents/docs/`，位于 EhReader Git 仓库内；README 和 CHANGELOG 仍位于 `EhReader/docs`。工作区根目录保持现有布局：release 存放本地 arm64-v8a 产物及交付材料，temp 存放临时文件，trash 回收废弃文件或目录，详细用途以[目录约定](LOCAL_DEVELOPMENT.md#工作区目录约定)为准。
+本规范位于 EhReader 仓库的 `.agents/docs/`；README 和 CHANGELOG 仍位于 `EhReader/docs`。工作区根目录保持现有布局：release 存放本地 arm64-v8a 产物及交付材料，temp 存放临时文件，trash 回收废弃文件或目录，详细用途以[目录约定](LOCAL_DEVELOPMENT.md#工作区目录约定)为准。
 
 每个主题只有一个权威来源：编码风格在 CODING_STANDARDS，本地验证在 LOCAL_DEVELOPMENT，行为测试在 TESTING_STANDARDS，架构在 ARCHITECTURE，授权和分支在 REPOSITORY_WORKFLOW，版本与发行在 RELEASE_POLICY。
 
@@ -37,7 +37,7 @@
 
 ## 文档维护
 
-仓库 `.agents/docs/` 保存规范与参考资料；同级 `.agents/skills/` 保存可复用任务技能。文档维护使用 [docs-maintenance](../skills/docs-maintenance/SKILL.md)，按需引用本目录的权威规范。规范通过 AGENTS.md 引导阅读，迁移本身不会将文档变成技能。
+仓库 `.agents/docs/` 保存规范与开发参考资料；需求统一维护在工作区根目录的[需求分析记录整理](../../../需求分析记录整理.md)，存放、缩略及去重规则见[目录约定](LOCAL_DEVELOPMENT.md#工作区目录约定)。同级 `.agents/skills/` 保存可复用任务技能。文档维护使用 [docs-maintenance](../skills/docs-maintenance/SKILL.md)，按需引用本目录的权威规范。规范通过 AGENTS.md 引导阅读，迁移本身不会将文档变成技能。
 
 明确要求本地 Docker 打包或产物核验时使用 [docker-build-validation](../skills/docker-build-validation/SKILL.md)，技能中的能力表区分现有入口与尚需补齐的证据；创建技能不代表实际打包验收通过。
 

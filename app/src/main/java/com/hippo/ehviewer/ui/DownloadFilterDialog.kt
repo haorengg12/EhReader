@@ -181,7 +181,19 @@ internal class DownloadFilterDialog(
                     status.setText(R.string.offline_filter_rating_error)
                     return@setOnClickListener
                 }
-                apply(DownloadFilter(selected[0].toList(), selected[1].toList(), selected[2].toList(), title.text.toString(), categories[category.selectedItemPosition], languages[language.selectedItemPosition], ratings.first, ratings.second, (state.selectedItemPosition - 1).takeIf { it >= 0 }, DownloadFilterSort.entries[sort.selectedItemPosition]))
+                val filter = DownloadFilter(
+                    all = selected[0].toList(),
+                    any = selected[1].toList(),
+                    excluded = selected[2].toList(),
+                    title = title.text.toString(),
+                    category = categories[category.selectedItemPosition],
+                    language = languages[language.selectedItemPosition],
+                    minimumRating = ratings.first,
+                    maximumRating = ratings.second,
+                    state = (state.selectedItemPosition - 1).takeIf { it >= 0 },
+                    sort = DownloadFilterSort.entries[sort.selectedItemPosition],
+                )
+                if (filter != DownloadFilter()) apply(filter)
                 dialog.dismiss()
             }
         }

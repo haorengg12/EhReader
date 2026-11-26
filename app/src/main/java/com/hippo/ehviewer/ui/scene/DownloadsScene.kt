@@ -254,10 +254,11 @@ class DownloadsScene :
     }
 
     private fun updateTitle() {
+        val label = mLabel ?: getString(R.string.download_all)
         val scope = if (offlineFilter != null || mType != -1) {
-            getString(R.string.download_filter)
+            "${getString(R.string.download_filter)} - $label"
         } else {
-            mLabel ?: getString(R.string.download_all)
+            label
         }
         setTitle(getString(R.string.scene_download_title, scope))
     }
@@ -519,9 +520,8 @@ class DownloadsScene :
                     val matches = gids.mapNotNullTo(ArrayList(gids.size), DownloadManager::getDownloadInfo)
                     mList = matches
                     mAdapter?.notifyDataSetChanged()
-                    if (resetScroll) mRecyclerView?.scrollToPosition(0)
+                    updateView(resetScroll)
                     resetScroll = false
-                    updateView()
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -558,12 +558,14 @@ class DownloadsScene :
         }
     }
 
-    fun updateView() {
+    private fun updateView(resetScroll: Boolean = false) {
         mTip?.setText(if (offlineFilter == null) R.string.no_download_info else R.string.offline_filter_empty_results)
         if (mList.isNullOrEmpty()) {
             mViewTransition?.showView(1)
-        } else {
-            mViewTransition?.showView(0)
+        } else if (mViewTransition?.showView(0) == true || resetScroll) {
+            // 空结果没有可用的滚动锚点，重新显示列表时将首项对齐到内容顶部。
+            mRecyclerView?.stopScroll()
+            mLayoutManager?.scrollToPositionWithOffset(0, 0)
         }
     }
 

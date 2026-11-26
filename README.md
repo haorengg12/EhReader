@@ -18,7 +18,7 @@ EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0
 ## 构建与签名
 
 需要 JDK 21、Android SDK 36、Build Tools 36.0.0、NDK 29.0.14206865 和 CMake。
-本地检查和 Debug 打包按仓库内[本地开发规范](.agents/docs/LOCAL_DEVELOPMENT.md) 选择。本地使用仓库外的 Docker 入口，临时配置仅应用于容器源码副本；正式包由 CI/CD 构建：
+本地检查和 Debug 打包按仓库内[本地开发规范](.agents/docs/LOCAL_DEVELOPMENT.md) 选择。本地使用仓库外的 Docker 入口，临时配置仅应用于容器源码副本。以下命令从仓库根目录执行，正式包由 CI/CD 构建。
 
 ```powershell
 $repo = (Get-Location).Path

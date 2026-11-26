@@ -1,6 +1,6 @@
 # EhReader AI 协作入口
 
-适用仓库：haorengg12/EhReader。规范更新日期：2026-11-14。
+适用仓库：haorengg12/EhReader。规范更新日期：2026-11-18。
 
 请按本入口及其引用规范执行。开始只读本文件和[开发任务流程](.agents/docs/DEVELOPMENT_FLOW.md)，确认任务所在阶段、范围和验证计划；进入下一阶段前再读对应规范，不在开工时批量读取全部文档。同一任务内已读且未变化的内容直接复用。
 
@@ -8,6 +8,7 @@
 
 - 模型与推理等级参考[开发流程节点推荐组合](.agents/docs/DEVELOPMENT_FLOW.md#节点推荐组合)；默认沿用 GPT-6.1 Sol + High，需要升级时给出理由，由用户决定是否切换。
 - 先检查分支和工作区，保留其他任务改动。默认分支 master，日常开发分支 develop。
+- 需求统一维护在工作区根目录的[需求分析记录整理](../需求分析记录整理.md)；无特殊说明不另建需求分析文档，禁止在 `.agent/docs` 或 `.agents/docs` 生成需求文档。已完成项仅保留简述及必要状态，同一要求只在所属需求处展开；存放细则见[目录约定](.agents/docs/LOCAL_DEVELOPMENT.md#工作区目录约定)。
 - 每次任务按流程推进；跳过不适用阶段须说明原因，不把模拟、未执行、NO-SOURCE 或失败称为通过。
 - 每次数据库表关系或结构改变，按[数据库文档同步规则](.agents/docs/CODING_STANDARDS.md#数据库文档同步)在同一次修改中更新相关文档与 schema。
 - 工作区目录按[本地开发规范](.agents/docs/LOCAL_DEVELOPMENT.md#工作区目录约定)管理：规范在仓库内 `.agents/docs`，本地 arm64-v8a 产物放工作区 `release`，临时文件放 `temp`，废弃文件或目录回收到 `trash`；两个根目录 AGENTS.md 保留为入口。临时日志、排查记录等按[临时文件规则](.agents/docs/DEVELOPMENT_FLOW.md#临时文件存放)管理。

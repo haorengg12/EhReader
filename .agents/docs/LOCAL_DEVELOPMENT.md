@@ -4,7 +4,7 @@
 
 ## 工作区目录约定
 
-用户于 2026-11-06 确认将 `.agents/` 移入 EhReader 仓库，规范位于 `.agents/docs/`，与 `.agents/skills/` 并列；其余工作区目录保持现有布局。工作区根目录是 `..`，Git 仓库根目录是其下的 `EhReader`，二者分别管理本地资料和仓库源码。
+用户于 2026-11-06 确认将 `.agents/` 移入 EhReader 仓库，规范位于 `.agents/docs/`，与 `.agents/skills/` 并列；其余工作区目录保持现有布局。Git 仓库位于工作区的 `EhReader/` 子目录。以下表格中的路径均相对于工作区根目录。
 
 | 工作区相对路径 | 用途 |
 | --- | --- |
@@ -12,7 +12,8 @@
 | `EhReader/` | Git 仓库、源码、构建配置和仓库入口 AGENTS.md |
 | `EhReader/.agents/` | AI 协作资料目录，包含规范 docs 和技能 skills |
 | `EhReader/.agents/skills/` | 项目级可复用任务技能；按技能描述匹配任务，规范正文仍在 docs |
-| `EhReader/.agents/docs/` | 本地开发规范、流程说明、流程图、验收记录、需求资料和模型指南；流程图为 DEVELOPMENT_FLOWCHART.md |
+| `EhReader/.agents/docs/` | 本地开发规范、流程说明、流程图、验收记录和模型指南；流程图为 DEVELOPMENT_FLOWCHART.md，不存放需求文档 |
+| `需求分析记录整理.md` | 需求分析的统一正文，在工作区根目录维护 |
 | `EhReader/docs/` | 保留 README、CHANGELOG 目录及 README.upstream.md，不存放已迁出的开发规范 |
 | `release/` | 本地 arm64-v8a 打包产物及随包校验清单、构建来源清单和最终验收报告；按构建分组保存 |
 | `temp/` | 临时文件，包括日志、排查记录、临时报告、迁移清单和一次性辅助文件；按任务及阶段分组 |
@@ -20,6 +21,8 @@
 | `build-tools/` | 仓库外 Docker 构建入口及本地临时替换文件，沿用现有子目录 |
 
 源码、规范、产物、临时文件和废弃文件按上表归位；其他既有目录保持现状，不因规范更新批量移动或删除。确认废弃的文件或目录移入 `trash`，需要恢复时核对来源；创建回收目录不等于授权永久删除。
+
+需求分析默认直接更新工作区根目录现有的[需求分析记录整理](../../../需求分析记录整理.md)，无特殊说明不单独生成文档。禁止将需求文档生成到 `EhReader/.agent/docs/`（单数）或 `EhReader/.agents/docs/`（现有规范目录）；用户明确要求另建时，使用其指定的其他位置。已完成需求只保留简短描述和必要的实现/验收状态，详细过程保留在既有验收记录；同一需求只在所属编号处展开，排期、验收和其他章节通过引用关联，不复制正文。
 
 本地 `release` 文件夹用于保存打包交付材料，GitHub 正式发行仍按发布规范执行。开发规范位于 Git 仓库内的 `.agents/docs/`，提交后随对应版本的克隆和 CI checkout 携带，不在其他位置维护副本。文中 `app/`、`scripts/`、`.github/` 等源码路径均相对 EhReader 仓库根目录；`.agents/docs/` 和 `.agents/skills/` 相对仓库根目录；`release/`、`temp/`、`trash/` 相对工作区根目录。
 
@@ -47,7 +50,7 @@
 | 数据库、下载或文件操作 | 上述检查加测试规范规定的回归验证 |
 | 仅工作流 | YAML/脚本静态检查、触发条件和权限审查；实际运行由获准推送后的 CI 验证 |
 
-Windows 上从 `.` 执行的文本检查和 Docker 打包入口（按变更选择，不要求每次全部重跑）：
+Windows 上从 Git 仓库根目录执行的文本检查和 Docker 打包入口（按变更选择，不要求每次全部重跑）：
 
 ```powershell
 $standardsFiles = @(Get-ChildItem -LiteralPath '.agents\docs' -File -Filter '*.md' | ForEach-Object { $_.FullName })
@@ -90,7 +93,7 @@ node scripts/local-task.mjs record --task my-task --append
 | app、Gradle、Wrapper 等 Android 输入 | 调用仓库外现有 build.ps1 的 Debug 模式；先固定现有镜像 ID、检查固定工作卷占用，不拉取镜像、不提升为 ReleaseAll |
 | YAML、Python、PowerShell、Shell 或未识别文件 | 不猜测业务影响；可执行的检查照常运行，但未自动完成的语法/行为检查明确列入缺项，不记全部通过 |
 
-Android 构建日志和中间报告先输出至本次 temp；命令成功、宿主源码前后内容未变且 APK 与散列清单一致后，才将 APK、校验及来源材料整理至 `release/<任务名>-<本次尝试>`。现有 Docker 验证器负责实际包名、版本、ABI、签名有效性及对齐检查；调试证书预期指纹、完整实际工具版本、替换基线和设备测试等缺项仍按能力表补查，不能把包生成成功写成完整验收通过。
+Android 构建日志和中间报告先输出至本次 temp；命令成功、宿主源码前后内容未变且 APK 与散列清单一致后，才将 APK、校验及来源材料整理至[本地测试包交付目录](#本地测试包交付命名)。当前调度脚本实际导出到 `release/<任务名>-<本次尝试>`，仍需按交付规范整理。现有 Docker 验证器负责实际包名、版本、ABI、签名有效性及对齐检查；调试证书预期指纹、完整实际工具版本、替换基线和设备测试等缺项仍按能力表补查，不能把包生成成功写成完整验收通过。
 
 `awaiting-review` 表示已调度检查完成、等待按开发流程审阅；`needs-manual-validation` 表示仍有明确缺项；`failed/blocked` 表示失败或无法继续，均不能直接作为提交依据。即使本地检查完成，脚本也不取得人工测试或推送权限。Node 调度器测试使用临时隔离仓库与模拟 Docker 入口，不把模拟通过当作真实 Android 构建。
 
@@ -102,7 +105,7 @@ Android 构建日志和中间报告先输出至本次 temp；命令成功、宿�
 
 ## 容器内临时替换文件
 
-- 本地构建专用文件统一放在仓库外 `../build-tools/build-use-file/`，不得先修改原仓库再还原。
+- 本地构建专用文件统一放在仓库外 `../build-tools/build-use-file/`（相对仓库根目录），不得先修改原仓库再还原。
 - 需要完整替换文件时，按仓库相对路径存放，例如 `build-use-file/app/build.gradle.kts` 对应容器构建副本的 `/workspace/ehreader/app/build.gradle.kts`；其他文件遵守同一规则。
 - 每次先将本次源码同步到容器构建副本，再将本次需要的替换文件复制到对应位置，随后执行检查和编译。替换只作用于该次容器工作副本，不写回 Windows 仓库，也不把它固化到可复用工具链镜像。
 - 外部 Gradle 初始化脚本也保存在该目录，仅在需要时加载，不作为仓库相对路径覆盖文件。现有 `local-cache.init.gradle` 用于缓存解析；`full-abis.init.gradle` 不属于日常 ARM64 构建，不能默认加载。
@@ -117,12 +120,18 @@ Android 构建日志和中间报告先输出至本次 temp；命令成功、宿�
 3. **替换文件有效性**：记录本次源码 SHA、工作区未提交状态、每个替换文件的相对目标路径、用途、基于的原文件 SHA-256 和替换文件 SHA-256；初始化脚本也列入清单。原文件已变化时先审阅和更新替换文件，不能直接用过期副本覆盖。目标必须位于容器源码副本内，拒绝绝对路径、路径穿越或符号链接导致的越界写入。每次重新从当前源码同步，避免沿用上次覆盖内容。
 4. **原仓库完整性**：构建前后对比原仓库状态及相关文件内容，确认 Docker 没有修改原仓库或写回临时配置。已有未提交改动也属于输入，必须保留；发现差异先调查，不能自动还原用户或其他任务的新修改。替换影响构建逻辑时，记录明确说明该产物来自“源码快照 + 本地替换”，不能声称它等同于未经替换的 CI 构建。
 5. **检查与包验证**：按变更矩阵完成 Spotless、适用测试、显式 lint 和构建；核对 APK 包名、版本、实际原生库仅 arm64-v8a、签名身份和对齐。本地 Debug 使用持久的调试签名；正式密钥仍须另获授权，不能写入镜像、替换文件、缓存、日志或附件。不得通过改版本、关闭检查或更换签名来掩盖失败。
-6. **导出与留证**：APK、SHA-256 清单、镜像/源码/替换清单及最终验收报告输出到仓库外 `release/<时间戳>-docker-<构建类型>`；构建日志、失败诊断、临时检查报告和排查辅助文件统一放在工作区根目录 `../temp/`，按[临时文件存放规则](DEVELOPMENT_FLOW.md#临时文件存放)分组。记录实际命令与退出状态，并在最终报告中引用对应日志。失败不标记 PASS；`NO-SOURCE`、警告和未运行项目分别记录。包含未提交改动时，仅有 Git SHA 不足以标识实际输入。
+6. **导出与留证**：APK、SHA-256 清单、镜像/源码/替换清单及最终验收报告统一整理到[本地测试包交付目录](#本地测试包交付命名)；构建日志、失败诊断、临时检查报告和排查辅助文件统一放在工作区的 `temp/` 目录，按[临时文件存放规则](DEVELOPMENT_FLOW.md#临时文件存放)分组。记录实际命令与退出状态，并在最终报告中引用对应日志。失败不标记 PASS；`NO-SOURCE`、警告和未运行项目分别记录。包含未提交改动时，仅有 Git SHA 不足以标识实际输入。
 7. **设备验收**：按本次功能在设备上安装、启动和验证；设备验收与容器构建分别记录。设备不可用时写明未执行，不以打包成功代替运行验收。最终在仓库[ACCEPTANCE.md](ACCEPTANCE.md)追加简短结论并链接本次证据目录。
 
 实施边界：现有 Docker 入口已有部分构建、包验证与导出能力；通用文件覆盖、替换文件基线/散列和构建前后完整性自动核验尚需后续适配。这里规定应完成的验收，不代表所有检查已经自动实现。
 
-具体执行可用 [Docker 构建验收技能](../skills/docker-build-validation/SKILL.md)，其[当前能力表](../skills/docker-build-validation/references/current-capabilities.md)按实际脚本核对缺项。现有入口默认将 build.log 和中间报告写入 release；新任务可使用已有 `-OutputRoot` 参数先输出到本次 temp 目录，再将验证成功的 APK、清单和最终报告整理至 release，日志保留在 temp。本次仅明确使用方式，不迁移历史材料、不迁移或改写仓库外入口。
+具体执行可用 [Docker 构建验收技能](../skills/docker-build-validation/SKILL.md)，其[当前能力表](../skills/docker-build-validation/references/current-capabilities.md)按实际脚本核对缺项。现有入口默认将 build.log 和中间报告写入 `release/<时间戳>-docker-Debug`；新任务可使用 `-OutputRoot` 参数先输出到本次 temp 目录，再按[交付命名](#本地测试包交付命名)整理验证成功的 APK、清单和最终报告。日志保留在 temp，历史材料保留原路径。
+
+## 本地测试包交付命名
+
+- 交付目录为工作区的 `release/yyyy年MM月dd日-HH时mm分ss秒-<临时版本号>/`。时间戳取本次打包的本地时间，`HH` 使用 24 小时制。
+- APK 文件名为 `EhReader-<临时版本号>-local-arm64-v8a.apk`。目录和文件名中的临时版本号均与 APK 内的四段 `versionName` 一致。第四段的递增规则见[发布规范](RELEASE_POLICY.md#比较基准与合法性)。
+- 例如 `release/2026年11月22日-00时19分06秒-1.8.16.1/EhReader-1.8.16.1-local-arm64-v8a.apk`。校验清单、构建来源清单和最终验收报告随包存放。
 
 ## 随包验收报告
 
@@ -130,7 +139,7 @@ Android 构建日志和中间报告先输出至本次 temp；命令成功、宿�
 
 ## 本地打包与失败处理
 
-- 本地日常打包仅生成 arm64-v8a 的 Debug APK，不生成其他 ABI 或通用包；构建完成后导出到 `../release/<时间戳>-docker-Debug`。容器内中间产物位于构建副本的 `app/build/outputs/apk/debug/`，不写回原仓库。
+- 本地日常打包仅生成 arm64-v8a 的 Debug APK。容器内中间产物位于构建副本的 `app/build/outputs/apk/debug/`，不写回原仓库。
 - 评估对话中的 `ReleaseAll` 是当次明确批准的专项验证，不构成后续全架构构建或正式密钥使用的常规授权。获准的本地 Release 默认也仅 ARM64；当前入口仅提供 Debug 和 ReleaseAll，后续若需 ARM64 Release，应先适配入口，不用 ReleaseAll 代替。不得在本地伪造 GITHUB_ACTIONS=true。
 - GitHub Actions 按完整架构构建：arm64-v8a、armeabi-v7a、x86_64 及 universal；Debug 和 Release 均适用。构建配置以 GitHub Actions 环境区分本地与远程，修改架构集合需同步发布附件校验。
 - Nettle 下载源码位于各 ABI 的 `.cxx/<配置>/<构建标识>/<ABI>/_deps/nettle`，不得改回共享源码树目录。`native-sources.mjs` 从实际 CMakeCache 核对目录隔离、ABI 覆盖与源码一致性，正式源码附件也复用该检查。AGP 正式变体通常使用 `RelWithDebInfo`；Release 审计兼容该目录及 `Release`、`MinSizeRel`，不能假设目录一定叫 Release。

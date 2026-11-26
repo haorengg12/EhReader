@@ -34,7 +34,7 @@ $builder = Join-Path $workspaceRoot 'build-tools/ehreader-docker/build.ps1'
 
 ## 交付与记录
 
-只有本次构建及必要包检查成功后，才将本次 APK、SHA256SUMS、来源清单及最终验收报告整理到工作区 `release/<本次构建>`。直接使用入口的默认 OutputRoot 会把日志也放进 release；以上示例利用已有参数避免这一点，无需迁移历史材料。日志、lint/test 报告等留在 temp 并由最终报告引用。
+只有本次构建及必要包检查成功后，才按[本地测试包交付命名](../../docs/LOCAL_DEVELOPMENT.md#本地测试包交付命名)整理 APK、SHA256SUMS、来源清单及最终验收报告。直接使用入口的默认 OutputRoot 会把日志也放进 release；以上示例利用已有参数避免这一点，无需迁移历史材料。日志、lint/test 报告等留在 temp 并由最终报告引用。
 
 来源清单补齐实际命令/退出状态、镜像与工具版本、Git SHA/dirty 状态、输入和替换散列、宿主构建前后比较、实际包身份/版本/ABI/证书及对齐结果。仅有 SHA 和 source-status.txt 不能完整标识未提交内容。无法补齐的证据明确列为未验证；包生成成功与完整验收分别给出结论。
 

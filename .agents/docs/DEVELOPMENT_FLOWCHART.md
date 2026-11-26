@@ -1,10 +1,10 @@
 # EhReader 开发流程图
 
-更新日期：2026-11-14。阶段见[开发流程](DEVELOPMENT_FLOW.md)，版本算法见[发布规范](RELEASE_POLICY.md)，权限见[仓库管理](REPOSITORY_WORKFLOW.md)。模型选择参考[节点推荐组合](DEVELOPMENT_FLOW.md#节点推荐组合)，不改变授权条件。
+更新日期：2026-11-18。阶段见[开发流程](DEVELOPMENT_FLOW.md)，版本算法见[发布规范](RELEASE_POLICY.md)，权限见[仓库管理](REPOSITORY_WORKFLOW.md)。模型选择参考[节点推荐组合](DEVELOPMENT_FLOW.md#节点推荐组合)，不改变授权条件。
 
 ```mermaid
 flowchart TD
- A[1. 核对任务、分支与工作区] --> B[2. 本地开发与版本准备]
+ A[1. 核对任务、分支与工作区，需求归入现有总文档] --> B[2. 本地开发与版本准备]
  B --> V{版本目标是否明确}
  V -->|缺测试包或上传版本| W[只等待缺少决定，继续无关本地工作]
  W --> B

@@ -643,10 +643,10 @@
     <string name="gallery_detail_local_error">正在顯示本機儲存的畫廊資訊。%1$s</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
     <string name="settings_compatibility">相容性</string>
-    <string name="settings_compatibility_import_legacy">匯入舊版本EhViewer資料</string>
-    <string name="settings_compatibility_import_legacy_summary">匯入舊版本 EhViewer 的資料，尚未開放。</string>
-    <string name="settings_compatibility_restore_downloads">還原下載項目（舊版本）</string>
-    <string name="settings_compatibility_restore_downloads_summary">遷移舊版本下載目錄中的本機檔案，尚未開放。</string>
+    <string name="settings_compatibility_import_legacy">匯入舊版本資料</string>
+    <string name="settings_compatibility_import_legacy_summary">僅支援綠E或白Ev1.8.14（測試）</string>
+    <string name="settings_compatibility_restore_downloads">匯入舊版本畫廊</string>
+    <string name="settings_compatibility_restore_downloads_summary">遷移綠E或白Ev1.8.14的本機畫廊（測試）</string>
     <string name="settings_compatibility_unavailable">此功能尚未開放</string>
     <string name="settings_download_restore_report">恢復 %1$d 項，略過 %2$d 項，失敗 %3$d 項。</string>
     <string name="settings_download_clean_redundancy_report">清理 %1$d 項，略過 %2$d 項，失敗 %3$d 項。</string>

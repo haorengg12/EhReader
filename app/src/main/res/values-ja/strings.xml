@@ -633,10 +633,10 @@
     <string name="gallery_detail_local_error">保存済みのギャラリー情報を表示しています。%1$s</string>
     <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
     <string name="settings_compatibility">互換性</string>
-    <string name="settings_compatibility_import_legacy">旧バージョンのEhViewerデータをインポート</string>
-    <string name="settings_compatibility_import_legacy_summary">旧バージョンの EhViewer のデータをインポートします。現在は利用できません。</string>
-    <string name="settings_compatibility_restore_downloads">ダウンロードを復元（旧バージョン）</string>
-    <string name="settings_compatibility_restore_downloads_summary">旧バージョンのローカルダウンロードを移行します。現在は利用できません。</string>
+    <string name="settings_compatibility_import_legacy">旧バージョンのデータをインポート</string>
+    <string name="settings_compatibility_import_legacy_summary">緑Eまたは白E v1.8.14 のみ対応（テスト）</string>
+    <string name="settings_compatibility_restore_downloads">旧バージョンのギャラリーをインポート</string>
+    <string name="settings_compatibility_restore_downloads_summary">緑Eまたは白E v1.8.14 のローカルギャラリーを移行（テスト）</string>
     <string name="settings_compatibility_unavailable">この機能はまだ利用できません。</string>
     <string name="settings_download_restore_report">復元 %1$d 件、スキップ %2$d 件、失敗 %3$d 件。</string>
     <string name="settings_download_clean_redundancy_report">削除 %1$d 件、スキップ %2$d 件、失敗 %3$d 件。</string>
