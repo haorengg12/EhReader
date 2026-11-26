@@ -23,51 +23,209 @@ import androidx.room.Room.databaseBuilder
 import com.hippo.ehviewer.EhApplication.Companion.ehDatabase
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.dao.BasicDao
+import com.hippo.ehviewer.dao.DownloadDeletionSql
 import com.hippo.ehviewer.dao.DownloadDirname
 import com.hippo.ehviewer.dao.DownloadInfo
 import com.hippo.ehviewer.dao.DownloadLabel
+import com.hippo.ehviewer.dao.DownloadRecord
+import com.hippo.ehviewer.dao.DownloadTagIndex
 import com.hippo.ehviewer.dao.EhDatabase
 import com.hippo.ehviewer.dao.Filter
+import com.hippo.ehviewer.dao.GalleryMetadata
 import com.hippo.ehviewer.dao.HistoryInfo
+import com.hippo.ehviewer.dao.HistoryRecord
 import com.hippo.ehviewer.dao.LocalFavoriteInfo
+import com.hippo.ehviewer.dao.LocalFavoriteRecord
 import com.hippo.ehviewer.dao.QuickSearch
+import com.hippo.ehviewer.dao.ReadingState
 import com.hippo.ehviewer.download.DownloadManager
 import com.hippo.unifile.UniFile
 import com.hippo.util.sendTo
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 object EhDB {
     private val TAG = EhDB::class.java.simpleName
     private val db = ehDatabase
+    private val deletingDownloads = mutableSetOf<Long>()
+    var onGalleryMetadataChanged: ((GalleryMetadata) -> Unit)? = null
 
-    // Fix state
+    // 启动与备份重载共用；数据库状态须与调度器内存一致，供离线状态筛选使用。
     @get:Synchronized
     val allDownloadInfo: List<DownloadInfo>
-        get() = db.downloadsDao().list().onEach {
-            if (it.state == DownloadInfo.STATE_WAIT || it.state == DownloadInfo.STATE_DOWNLOAD) {
-                it.state = DownloadInfo.STATE_NONE
+        get() {
+            var result = emptyList<DownloadInfo>()
+            db.runInTransaction {
+                db.downloadsDao().resetInterruptedStates()
+                result = db.downloadsDao().list()
+            }
+            return result
+        }
+
+    /** 所有业务写入先建立 GID 主记录，再在同一事务保存业务行。 */
+    @Synchronized
+    fun putGalleryMetadata(info: GalleryInfo, url: String? = null, account: String? = currentAccount()) {
+        require(info.gid > 0)
+        val nested = db.inTransaction()
+        var saved: GalleryMetadata? = null
+        db.runInTransaction {
+            val dao = db.galleryMetadataDao()
+            val old = dao.load(info.gid)
+            val persistedView = info is DownloadInfo || info is HistoryInfo || info is LocalFavoriteInfo
+            if (old == null || !persistedView || url != null) {
+                saved = (old ?: GalleryMetadata(info.gid)).merge(info, url, account)
+                dao.put(saved)
+                if (old?.tags != saved.tags) DownloadTagIndex.sync(db.openHelper.writableDatabase, info.gid, saved.tags)
             }
         }
+        if (!nested) saved?.let { onGalleryMetadataChanged?.invoke(it) }
+    }
+
+    fun getGalleryMetadata(gid: Long): GalleryMetadata? = db.galleryMetadataDao().load(gid)
+
+    fun currentAccount(): String? = com.hippo.ehviewer.client.EhCookieStore.getCookieValue(
+        com.hippo.ehviewer.client.EhUrl.HOST_E.toHttpUrl(),
+        com.hippo.ehviewer.client.EhCookieStore.KEY_IPB_MEMBER_ID,
+    )
+
+    fun getGalleryDetail(gid: Long): com.hippo.ehviewer.client.data.GalleryDetail? = getGalleryMetadata(gid)
+        ?.takeIf { it.metadataState == "complete" }?.galleryDetail(currentAccount())
+
+    fun getReadingState(gid: Long): ReadingState? = db.galleryMetadataDao().readingState(gid)
+
+    @Synchronized
+    fun putReadingState(gid: Long, page: Int? = null, spiderInfo: ByteArray? = null) {
+        db.runInTransaction {
+            val dao = db.galleryMetadataDao()
+            if (dao.load(gid) == null) dao.put(GalleryMetadata(gid))
+            val old = dao.readingState(gid) ?: ReadingState(gid)
+            dao.putReadingState(old.copy(page = page ?: old.page, spiderInfo = spiderInfo ?: old.spiderInfo))
+        }
+    }
 
     @Synchronized
     fun updateDownloadInfo(downloadInfos: List<DownloadInfo>) {
-        val dao = db.downloadsDao()
-        dao.update(downloadInfos)
+        db.runInTransaction { downloadInfos.forEach { putDownloadInfo(it) } }
     }
 
     @Synchronized
-    fun putDownloadInfo(downloadInfo: DownloadInfo) {
-        db.downloadsDao().run {
-            if (load(downloadInfo.gid) != null) {
-                update(downloadInfo)
-            } else {
-                insert(downloadInfo)
+    fun putDownloadInfo(info: DownloadInfo) {
+        if (info.gid in deletingDownloads) return
+        db.runInTransaction {
+            putGalleryMetadata(info)
+            val dao = db.downloadsDao()
+            val previous = dao.record(info.gid)
+            val record = previous ?: DownloadRecord(info.gid)
+            // 普通下载状态更新保留导入来源及旧路径；新记录使用实体默认标记 false。
+            dao.put(
+                record.copy(
+                    state = info.state,
+                    remainingPages = info.legacy,
+                    time = info.time,
+                    label = info.label,
+                    finishedPages = info.finished,
+                    attemptedPages = info.downloaded,
+                    totalPages = info.total,
+                ),
+            )
+            if (previous == null) DownloadTagIndex.sync(db.openHelper.writableDatabase, info.gid, db.galleryMetadataDao().load(info.gid)?.tags)
+        }
+    }
+
+    /** 文件清理成功后删除下载及位置；引用在事务内现查，失败回滚，重复调用不重复扣标签数。 */
+    @Synchronized
+    fun removeDownloadInfo(gid: Long, expectedLocation: DownloadDirname?): Boolean {
+        var removed = false
+        db.runInTransaction {
+            check(db.downloadDirnameDao().load(gid) == expectedLocation) { "Download location changed" }
+            if (db.downloadsDao().record(gid) == null) return@runInTransaction
+            val sql = db.openHelper.writableDatabase
+            val tagTables = sql.query(DownloadDeletionSql.TAG_TABLES).use { it.count }
+            check(tagTables == 0 || tagTables == 2) { "Incomplete download tag schema" }
+            val args = arrayOf<Any>(gid)
+            if (tagTables == 2) {
+                sql.execSQL(DownloadDeletionSql.DECREMENT_TAGS, args)
+                sql.execSQL(DownloadDeletionSql.REMOVE_EMPTY_TAGS, args)
+            }
+            sql.execSQL(DownloadDeletionSql.REMOVE_DOWNLOAD, args)
+            if (tagTables == 2) {
+                check(sql.query(DownloadDeletionSql.REMAINING_TAGS, args).use { !it.moveToFirst() }) { "Download tag cascade missing" }
+            }
+            sql.execSQL(DownloadDeletionSql.REMOVE_LOCATION, args)
+            sql.execSQL(DownloadDeletionSql.REMOVE_UNREFERENCED_METADATA, args)
+            removed = true
+        }
+        return removed
+    }
+
+    /** 下载退出后固定位置，阻止旧回调/分组写入在删除期间重新建立下载记录。 */
+    @Synchronized
+    fun beginDownloadDeletion(gid: Long): DownloadDirname? {
+        check(deletingDownloads.add(gid)) { "Download is already being deleted" }
+        return db.downloadDirnameDao().load(gid)?.copy()
+    }
+
+    @Synchronized
+    fun endDownloadDeletion(gid: Long) {
+        deletingDownloads.remove(gid)
+    }
+
+    fun getDownloadLocation(gid: Long): DownloadDirname? = db.downloadDirnameDao().load(gid)
+
+    @Synchronized
+    fun putDownloadLocation(location: DownloadDirname) {
+        check(location.gid !in deletingDownloads) { "Download is being deleted" }
+        db.runInTransaction {
+            val metadata = db.galleryMetadataDao()
+            if (metadata.load(location.gid) == null) metadata.put(GalleryMetadata(location.gid))
+            val dao = db.downloadDirnameDao()
+            if (dao.load(location.gid) == null) dao.insert(location) else dao.update(location)
+        }
+    }
+
+    /** 文件已核验后，一次事务提交可读位置和完成状态；事务失败保留临时源文件。 */
+    @Synchronized
+    fun completeDownload(location: DownloadDirname) {
+        db.runInTransaction {
+            putDownloadLocation(location)
+            db.downloadsDao().load(location.gid)?.let { info ->
+                info.state = DownloadInfo.STATE_FINISH
+                info.legacy = 0
+                info.finished = location.expectedPages
+                info.downloaded = location.expectedPages
+                info.total = location.expectedPages
+                putDownloadInfo(info)
             }
         }
     }
 
+    /** 恢复下载仅重建当前画廊的业务关系；原有导入标记、分组、旧路径及阅读进度保留。 */
     @Synchronized
-    fun removeDownloadInfo(downloadInfo: DownloadInfo) {
-        db.downloadsDao().delete(downloadInfo)
+    fun restoreDownload(info: GalleryInfo, location: DownloadDirname, finished: Int, spiderInfo: ByteArray, startPage: Int) {
+        check(info.gid !in deletingDownloads) { "Download is being deleted" }
+        require(info.gid == location.gid && location.expectedPages > 0 && finished in 0..location.expectedPages)
+        db.runInTransaction {
+            putGalleryMetadata(info)
+            putDownloadLocation(location)
+            val dao = db.downloadsDao()
+            val old = dao.record(info.gid) ?: DownloadRecord(info.gid, time = System.currentTimeMillis())
+            dao.put(
+                old.copy(
+                    state = if (location.phase == "complete") DownloadInfo.STATE_FINISH else DownloadInfo.STATE_NONE,
+                    remainingPages = location.expectedPages - finished,
+                    finishedPages = finished,
+                    attemptedPages = finished,
+                    totalPages = location.expectedPages,
+                ),
+            )
+            DownloadTagIndex.sync(db.openHelper.writableDatabase, info.gid, db.galleryMetadataDao().load(info.gid)?.tags)
+            val metadata = db.galleryMetadataDao()
+            val reading = metadata.readingState(info.gid)
+            if (reading == null) {
+                metadata.putReadingState(ReadingState(info.gid, startPage.coerceIn(0, location.expectedPages - 1), spiderInfo))
+            } else if (reading.spiderInfo == null) {
+                metadata.putReadingState(reading.copy(spiderInfo = spiderInfo))
+            }
+        }
     }
 
     @get:Synchronized
@@ -83,15 +241,9 @@ object EhDB {
 
     @Synchronized
     fun putDownloadDirname(gid: Long, dirname: String?) {
-        val dao = db.downloadDirnameDao()
-        var raw = dao.load(gid)
-        if (raw != null) {
-            raw.dirname = dirname
-            dao.update(raw)
-        } else {
-            raw = DownloadDirname(gid, dirname)
-            dao.insert(raw)
-        }
+        val location = getDownloadLocation(gid) ?: DownloadDirname(gid)
+        location.dirname = dirname
+        putDownloadLocation(location)
     }
 
     @Synchronized
@@ -196,16 +348,12 @@ object EhDB {
 
     @Synchronized
     fun putLocalFavorites(galleryInfo: GalleryInfo) {
-        val dao = db.localFavoritesDao()
-        if (null == dao.load(galleryInfo.gid)) {
-            val info: LocalFavoriteInfo
-            if (galleryInfo is LocalFavoriteInfo) {
-                info = galleryInfo
-            } else {
-                info = LocalFavoriteInfo(galleryInfo)
-                info.time = System.currentTimeMillis()
+        db.runInTransaction {
+            putGalleryMetadata(galleryInfo)
+            val dao = db.localFavoritesDao()
+            if (!dao.contains(galleryInfo.gid)) {
+                dao.put(LocalFavoriteRecord(galleryInfo.gid, (galleryInfo as? LocalFavoriteInfo)?.time ?: System.currentTimeMillis()))
             }
-            dao.insert(info)
         }
     }
 
@@ -277,32 +425,30 @@ object EhDB {
 
     @Synchronized
     fun putHistoryInfo(galleryInfo: GalleryInfo) {
-        val dao = db.historyDao()
-        val info = galleryInfo as? HistoryInfo ?: HistoryInfo(galleryInfo)
-        info.time = System.currentTimeMillis()
-        if (null != dao.load(info.gid)) {
-            dao.update(info)
-        } else {
-            dao.insert(info)
+        db.runInTransaction {
+            putGalleryMetadata(galleryInfo)
+            db.historyDao().put(HistoryRecord(galleryInfo.gid, System.currentTimeMillis()))
         }
     }
 
     @Synchronized
     fun updateHistoryFavSlot(gid: Long, slot: Int) {
-        val dao = db.historyDao()
-        val info = dao.load(gid)
-        if (null != info) {
-            info.favoriteSlot = slot
-            dao.update(info)
-        }
+        val metadata = getGalleryMetadata(gid) ?: return
+        val account = com.hippo.ehviewer.client.EhCookieStore.getCookieValue(
+            com.hippo.ehviewer.client.EhUrl.HOST_E.toHttpUrl(),
+            com.hippo.ehviewer.client.EhCookieStore.KEY_IPB_MEMBER_ID,
+        )
+        val snapshot = if (account == metadata.accountId) org.json.JSONObject(metadata.accountSnapshot ?: "{}") else org.json.JSONObject()
+        snapshot.put("favoriteSlot", slot).put("favorited", slot >= 0)
+        db.galleryMetadataDao().put(metadata.copy(accountId = account, accountSnapshot = snapshot.toString()))
     }
 
     @Synchronized
     fun putHistoryInfo(historyInfoList: List<HistoryInfo>) {
-        val dao = db.historyDao()
-        for (info in historyInfoList) {
-            if (null == dao.load(info.gid)) {
-                dao.insert(info)
+        db.runInTransaction {
+            historyInfoList.forEach {
+                putGalleryMetadata(it)
+                if (db.historyDao().load(it.gid) == null) db.historyDao().put(HistoryRecord(it.gid, it.time))
             }
         }
     }
@@ -310,7 +456,7 @@ object EhDB {
     @Synchronized
     fun deleteHistoryInfo(info: HistoryInfo?) {
         val dao = db.historyDao()
-        dao.delete(info!!)
+        dao.deleteByKey(info!!.gid)
     }
 
     @Synchronized
@@ -350,102 +496,94 @@ object EhDB {
         db.filterDao().update(filter)
     }
 
+    /** 在单个事务内修复全部下载标签及全局计数；失败保留重建前数据。 */
+    @Synchronized
+    fun rebuildDownloadTags() {
+        db.runInTransaction { DownloadTagIndex.rebuild(db.openHelper.writableDatabase) }
+    }
+
     private fun <T> copyDao(from: BasicDao<T>, to: BasicDao<T>) {
         val list = from.list()
         for (item in list) to.insert(item)
     }
 
+    /** 新版备份包括全部 GID 关系、位置及阅读状态；不含图片与目录授权。 */
     @Synchronized
     fun exportDB(context: Context, uri: Uri): Boolean {
-        val ehExportName = "eh.export.db"
-        runCatching {
-            // Delete old export db
-            context.deleteDatabase(ehExportName)
-            val newDb =
-                databaseBuilder(context, EhDatabase::class.java, ehExportName).build()
-
-            // Copy data to a export db
-            copyDao(db.downloadsDao(), newDb.downloadsDao())
-            copyDao(db.downloadLabelDao(), newDb.downloadLabelDao())
-            copyDao(db.downloadDirnameDao(), newDb.downloadDirnameDao())
-            copyDao(db.historyDao(), newDb.historyDao())
-            copyDao(db.quickSearchDao(), newDb.quickSearchDao())
-            copyDao(db.localFavoritesDao(), newDb.localFavoritesDao())
-            copyDao(db.filterDao(), newDb.filterDao())
-
-            // Close export db so we can copy it
-            newDb.close()
-
-            // Copy export db to data dir
-            val dbFile = context.getDatabasePath(ehExportName)
-            UniFile.fromFile(dbFile)!! sendTo UniFile.fromUri(context, uri)!!
-            return true
-        }.onFailure {
-            Log.e(TAG, "Error", it)
-        }
-        return false
+        val name = "ehreader.export.db"
+        return runCatching {
+            context.deleteDatabase(name)
+            databaseBuilder(context, EhDatabase::class.java, name).setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE).build().use { target ->
+                db.runInTransaction {
+                    target.runInTransaction {
+                        db.galleryMetadataDao().list().forEach { target.galleryMetadataDao().put(it) }
+                        db.downloadsDao().records().forEach { target.downloadsDao().put(it) }
+                        db.historyDao().records().forEach { target.historyDao().put(it) }
+                        db.localFavoritesDao().records().forEach { target.localFavoritesDao().put(it) }
+                        db.bookmarksBao().records().forEach { target.bookmarksBao().put(it) }
+                        db.galleryMetadataDao().readingStates().forEach { target.galleryMetadataDao().putReadingState(it) }
+                        copyDao(db.downloadLabelDao(), target.downloadLabelDao())
+                        copyDao(db.downloadDirnameDao(), target.downloadDirnameDao())
+                        copyDao(db.quickSearchDao(), target.quickSearchDao())
+                        copyDao(db.filterDao(), target.filterDao())
+                        DownloadTagIndex.rebuild(target.openHelper.writableDatabase)
+                    }
+                }
+            }
+            UniFile.fromFile(context.getDatabasePath(name))!! sendTo UniFile.fromUri(context, uri)!!
+            true
+        }.onFailure { Log.e(TAG, "Backup failed", it) }.getOrDefault(false).also { context.deleteDatabase(name) }
     }
 
-    /**
-     * @return error string, null for no error
-     */
+    /** 先验证新版备份所有表，再整体事务合并；本应用 schema 1/2 可迁移，旧版 eh.db 不自动转换，失败全部回滚。 */
     @Synchronized
     fun importDB(context: Context, uri: Uri): String? {
-        val tmpDBName = "tmp.db"
-        runCatching {
-            val oldDB = databaseBuilder(context, EhDatabase::class.java, tmpDBName)
-                .createFromInputStream { context.contentResolver.openInputStream(uri) }.build()
-            // Download label
-            val manager = DownloadManager
-            runCatching {
-                val downloadLabelList = oldDB.downloadLabelDao().list()
-                manager.addDownloadLabel(downloadLabelList)
-            }
-            // Downloads
-            runCatching {
-                val downloadInfoList = oldDB.downloadsDao().list()
-                manager.addDownload(downloadInfoList, false)
-            }
-            // Download dirname
-            runCatching {
-                oldDB.downloadDirnameDao().list().forEach {
-                    putDownloadDirname(it.gid, it.dirname)
+        val name = "ehreader.restore.db"
+        context.deleteDatabase(name)
+        return runCatching {
+            check(!DownloadManager.hasActiveDownloads()) { "Pause downloads before restoring" }
+            check(deletingDownloads.isEmpty()) { "Wait for download deletion before restoring" }
+            databaseBuilder(context, EhDatabase::class.java, name)
+                .addMigrations(DownloadTagIndex.MIGRATION_2_3)
+                .createFromInputStream { context.contentResolver.openInputStream(uri) }.build().use { source ->
+                    val metadata = source.galleryMetadataDao().list()
+                    val downloads = source.downloadsDao().records()
+                    val history = source.historyDao().records()
+                    val favorites = source.localFavoritesDao().records()
+                    val bookmarks = source.bookmarksBao().records()
+                    val reading = source.galleryMetadataDao().readingStates()
+                    val locations = source.downloadDirnameDao().list()
+                    val labels = source.downloadLabelDao().list()
+                    val searches = source.quickSearchDao().list()
+                    val filters = source.filterDao().list()
+                    db.runInTransaction {
+                        metadata.forEach { if (getGalleryMetadata(it.gid) == null) db.galleryMetadataDao().put(it) }
+                        downloads.forEach { if (db.downloadsDao().load(it.gid) == null) db.downloadsDao().put(it.copy(state = DownloadInfo.STATE_NONE)) }
+                        history.forEach { if (db.historyDao().load(it.gid) == null) db.historyDao().put(it) }
+                        favorites.forEach { if (!db.localFavoritesDao().contains(it.gid)) db.localFavoritesDao().put(it) }
+                        bookmarks.forEach { if (db.bookmarksBao().load(it.gid) == null) db.bookmarksBao().put(it) }
+                        reading.forEach { if (getReadingState(it.gid) == null) db.galleryMetadataDao().putReadingState(it) }
+                        locations.forEach { if (getDownloadLocation(it.gid) == null) putDownloadLocation(it.copy(rootUri = null)) }
+                        labels.forEach { label -> if (db.downloadLabelDao().list().none { it.label == label.label }) addDownloadLabel(label) }
+                        searches.forEach { item ->
+                            if (db.quickSearchDao().list().none { it.name == item.name }) {
+                                item.id = null
+                                db.quickSearchDao().insert(item)
+                            }
+                        }
+                        filters.forEach { item -> if (item !in db.filterDao().list()) addFilter(item) }
+                        DownloadTagIndex.rebuild(db.openHelper.writableDatabase)
+                    }
                 }
-            }
-            // History
-            runCatching {
-                val historyInfoList = oldDB.historyDao().list()
-                putHistoryInfo(historyInfoList)
-            }
-            // QuickSearch
-            runCatching {
-                val quickSearchList = oldDB.quickSearchDao().list()
-                val currentQuickSearchList = db.quickSearchDao().list()
-                val importList = quickSearchList.mapNotNull { newQS ->
-                    newQS.takeIf { currentQuickSearchList.find { it.name == newQS.name } == null }
-                }
-                importQuickSearch(importList)
-            }
-            // LocalFavorites
-            runCatching {
-                oldDB.localFavoritesDao().list().forEach {
-                    putLocalFavorites(it)
-                }
-            }
-            // Filter
-            runCatching {
-                val filterList = oldDB.filterDao().list()
-                val currentFilterList = db.filterDao().list()
-                filterList.forEach {
-                    if (it !in currentFilterList) addFilter(it)
-                }
-            }
-            oldDB.close()
-            context.deleteDatabase(tmpDBName)
-        }.onFailure {
-            Log.e(TAG, "Error", it)
-            return context.getString(R.string.settings_advanced_import_data_cant_read)
-        }
-        return null
+            null
+        }.onFailure { Log.e(TAG, "Restore failed", it) }
+            .getOrElse { context.getString(R.string.settings_advanced_import_data_cant_read) }
+            .also { context.deleteDatabase(name) }
     }
+}
+
+private inline fun <T> EhDatabase.use(block: (EhDatabase) -> T): T = try {
+    block(this)
+} finally {
+    close()
 }

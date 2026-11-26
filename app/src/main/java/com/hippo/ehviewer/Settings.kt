@@ -137,6 +137,7 @@ object Settings {
     private const val KEY_DOWNLOAD_SAVE_FRAGMENT = "image_fragment"
     const val KEY_MEDIA_SCAN = "media_scan"
     private const val DEFAULT_MEDIA_SCAN = false
+    const val KEY_CONCURRENT_GALLERIES = "concurrent_download_galleries"
     const val KEY_MULTI_THREAD_DOWNLOAD = "download_thread"
     private const val DEFAULT_MULTI_THREAD_DOWNLOAD = 3
     const val KEY_DOWNLOAD_DELAY = "download_delay_2"
@@ -576,6 +577,9 @@ object Settings {
     val mediaScan: Boolean
         get() = getBoolean(KEY_MEDIA_SCAN, DEFAULT_MEDIA_SCAN)
 
+    val concurrentGalleries: Int
+        get() = getIntFromStr(KEY_CONCURRENT_GALLERIES, 1).coerceIn(1, 10)
+
     val downloadThreadCount: Int
         get() = getIntFromStr(KEY_MULTI_THREAD_DOWNLOAD, DEFAULT_MULTI_THREAD_DOWNLOAD)
 
@@ -593,6 +597,9 @@ object Settings {
         1 -> true
         else -> false
     }
+
+    val saveAsCbz: Boolean
+        get() = getBoolean("save_as_cbz", true)
 
     val skipCopyImage: Boolean
         get() = getIntFromStr(KEY_DOWNLOAD_ORIGIN_IMAGE, DEFAULT_DOWNLOAD_ORIGIN_IMAGE) == 2

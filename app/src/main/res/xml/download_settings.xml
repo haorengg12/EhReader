@@ -23,12 +23,28 @@
         app:iconSpaceReserved="false" />
 
     <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:key="save_as_cbz"
+        android:title="@string/settings_download_save_as_cbz"
+        android:summary="@string/settings_download_save_as_cbz_summary"
+        app:iconSpaceReserved="false" />
+
+    <SwitchPreferenceCompat
         android:defaultValue="false"
         android:key="media_scan"
         android:title="@string/settings_download_media_scan"
         app:iconSpaceReserved="false"
         app:summaryOff="@string/settings_download_media_scan_summary_off"
         app:summaryOn="@string/settings_download_media_scan_summary_on" />
+
+    <rikka.preference.SimpleMenuPreference
+        android:defaultValue="1"
+        android:key="concurrent_download_galleries"
+        android:title="@string/settings_download_gallery_concurrency"
+        app:entries="@array/concurrent_gallery_counts"
+        app:entryValues="@array/concurrent_gallery_counts"
+        app:iconSpaceReserved="false"
+        app:useSimpleSummaryProvider="true" />
 
     <rikka.preference.SimpleMenuPreference
         android:defaultValue="3"

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_filter">离线筛选</string>
+    <string name="offline_filter_scope">分组：%1$s。各项条件组合生效。全选、反向开始作用于全部筛选结果。开始全部、暂停全部作用于整个下载列表。</string>
+    <string name="offline_filter_category">分类</string>
+    <string name="offline_filter_language">语言</string>
+    <string name="offline_filter_unknown">未记录</string>
+    <string name="offline_filter_min_rating">最低评分（0–5，可留空）</string>
+    <string name="offline_filter_max_rating">最高评分（0–5，可留空）</string>
+    <string name="offline_filter_remove_tag">移除：%1$s</string>
+    <string name="offline_filter_tag_mode">添加标签到</string>
+    <string name="offline_filter_tag_hint">完整命名空间:原始标签（如 artist:name）</string>
+    <string name="offline_filter_add_tag">添加标签</string>
+    <string name="offline_filter_tags">全局标签与数量</string>
+    <string name="offline_filter_rebuild">重建标签索引</string>
+    <string name="offline_filter_loading">正在读取…</string>
+    <string name="offline_filter_rebuilt">标签索引已重建</string>
+    <string name="offline_filter_failed">查询或重建失败，点击筛选重试。</string>
+    <string name="offline_filter_clear">清除筛选</string>
+    <string name="offline_filter_rating_error">评分须在 0–5 之间，最低分不能高于最高分。</string>
+    <string name="offline_filter_global_counts">数量覆盖所有下载记录，包含暂停、失败和未完成项，不随筛选变化。请用原始命名空间或标签名搜索。</string>
+    <string name="offline_filter_tag_search">搜索原始命名空间或标签</string>
+    <string name="offline_filter_previous">上一页</string>
+    <string name="offline_filter_next">下一页</string>
+    <string name="offline_filter_tag_page">全局标签 · 第 %1$d 页</string>
+    <plurals name="offline_filter_tag_count">
+        <item quantity="other">%1$s · %2$d 部</item>
+    </plurals>
+    <string name="offline_filter_empty_tags">没有匹配的标签。本地标签缺失时，可另外打开画廊详情联网补全。</string>
+    <string name="offline_filter_rating_desc">评分从高到低</string>
+    <string name="offline_filter_rating_asc">评分从低到高</string>
+    <string name="offline_filter_gid_desc">GID 从大到小</string>
+    <string-array name="download_tag_modes">
+        <item>包含全部标签（AND）</item>
+        <item>包含任一标签（OR）</item>
+        <item>排除这些标签（NOT）</item>
+    </string-array>
+    <string name="offline_filter_empty_results">没有符合条件的下载。</string>
+</resources>

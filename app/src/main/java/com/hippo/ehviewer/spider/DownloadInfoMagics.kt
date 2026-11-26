@@ -26,8 +26,8 @@ object DownloadInfoMagics {
     private const val DOWNLOAD_INFO_DIRNAME_URL_SEPARATOR = "|"
 
     fun encodeMagicRequest(info: DownloadInfo): String {
-        val url = info.thumbUrl!!
-        val location = DownloadManager.getDownloadDirname(info.gid)
+        val url = info.thumbUrl.orEmpty()
+        val location = info.gid.toString()
         return if (location.isNullOrBlank()) {
             url
         } else {

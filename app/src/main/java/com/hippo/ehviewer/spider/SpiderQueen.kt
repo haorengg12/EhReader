@@ -21,9 +21,11 @@ import androidx.annotation.IntDef
 import androidx.collection.LongSparseArray
 import androidx.collection.set
 import com.hippo.ehviewer.EhApplication.Companion.okHttpClient as plainTextOkHttpClient
+import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.GetText
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
+import com.hippo.ehviewer.client.EhCookieStore
 import com.hippo.ehviewer.client.EhEngine
 import com.hippo.ehviewer.client.EhRequestBuilder
 import com.hippo.ehviewer.client.EhUrl
@@ -32,11 +34,14 @@ import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.client.exception.QuotaExceededException
 import com.hippo.ehviewer.client.parser.GalleryDetailParser
 import com.hippo.ehviewer.client.parser.GalleryPageUrlParser
+import com.hippo.ehviewer.download.DownloadStorage
+import com.hippo.ehviewer.download.GalleryOperations
 import com.hippo.image.Image
 import com.hippo.unifile.UniFile
 import com.hippo.util.ExceptionUtils
 import com.hippo.util.launchIO
 import com.hippo.util.runSuspendCatching
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -47,15 +52,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.coroutines.executeAsync
 
 class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineScope {
@@ -73,15 +81,43 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
     private var mOldDownloadDir: UniFile? = null
     private var mOldHashMap: MutableMap<String, Int>? = null
+
+    @Volatile
     private var mReadReference = 0
+
+    @Volatile
     private var mDownloadReference = 0
 
-    fun addOnSpiderListener(listener: OnSpiderListener) {
-        synchronized(mSpiderListeners) { mSpiderListeners.add(listener) }
+    @Volatile
+    private var downloadListener: OnSpiderListener? = null
+
+    fun addOnSpiderListener(listener: OnSpiderListener, forDownload: Boolean = false) {
+        synchronized(mSpiderListeners) {
+            mSpiderListeners.add(listener)
+            if (forDownload) downloadListener = listener
+        }
+        // 订阅完成后才启动下载，避免本地命中或准备失败早于监听器注册。
+        launchIO {
+            try {
+                check(awaitReady()) { "Cannot prepare gallery" }
+                synchronized(mSpiderListeners) { if (listener in mSpiderListeners) listener.onGetPages(size) }
+                updateMode()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.e(TAG, "Cannot start gallery task", error)
+                synchronized(mSpiderListeners) {
+                    if (listener in mSpiderListeners) listener.onFinish(0, 0, galleryInfo.pages.coerceAtLeast(1))
+                }
+            }
+        }
     }
 
     fun removeOnSpiderListener(listener: OnSpiderListener) {
-        synchronized(mSpiderListeners) { mSpiderListeners.remove(listener) }
+        synchronized(mSpiderListeners) {
+            mSpiderListeners.remove(listener)
+            if (downloadListener === listener) downloadListener = null
+        }
     }
 
     private fun notifyGetPages(pages: Int) {
@@ -110,6 +146,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     }
 
     private fun notifyPageSuccess(index: Int) {
+        mSpiderInfo.saveToCache()
         synchronized(mSpiderListeners) {
             mSpiderListeners.forEach {
                 it.onPageSuccess(
@@ -136,17 +173,39 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         }
     }
 
+    @Synchronized
     private fun notifyAllPageDownloaded() {
-        synchronized(mSpiderListeners) {
-            mSpiderListeners.forEach {
-                it.onFinish(
-                    mFinishedPages.get(),
-                    mDownloadedPages.get(),
-                    mPageStateArray.size,
-                )
+        if (mDownloadedPages.get() != size) return
+        if (!finishing.compareAndSet(false, true)) return
+        val publish = downloadMode
+        val listeners = synchronized(mSpiderListeners) { mSpiderListeners.toList() }
+        finishJob = launch {
+            var success = mFinishedPages.get()
+            if (publish && success == size) {
+                try {
+                    writeSpiderInfoToLocal()
+                    val context = currentCoroutineContext()
+                    DownloadStorage.finish(galleryInfo.gid, size) { context.ensureActive() }
+                    mSpiderDen.downloadDir = DownloadStorage.imageDirectory(galleryInfo.gid)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(TAG, "Cannot finalize gallery", error)
+                    EhDB.getDownloadLocation(galleryInfo.gid)?.let {
+                        it.lastError = error.message
+                        EhDB.putDownloadLocation(it)
+                    }
+                    success = (size - 1).coerceAtLeast(0)
+                }
+            }
+            if (success == size) {
+                mSpiderInfo.upgradeFrom = null
+                mSpiderInfo.saveToCache()
+            }
+            synchronized(mSpiderListeners) {
+                listeners.filter { it in mSpiderListeners && (publish || it !== downloadListener) }.forEach { it.onFinish(success, mDownloadedPages.get(), size) }
             }
         }
-        mSpiderInfo.upgradeFrom = null
     }
 
     fun notifyGetImageSuccess(index: Int, image: Image) {
@@ -165,6 +224,9 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         }
     }
 
+    private val finishing = AtomicBoolean(false)
+    private var finishJob: Job? = null
+    private var downloadExit: Job? = null
     private var downloadMode = false
     val isReady
         get() = this::mSpiderInfo.isInitialized && this::mPageStateArray.isInitialized
@@ -172,7 +234,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     @Synchronized
     private fun updateMode() {
         if (!isReady) return
-        val mode: Int = if (mDownloadReference > 0) {
+        val mode: Int = if (mDownloadReference > 0 && downloadListener != null) {
             MODE_DOWNLOAD
         } else {
             MODE_READ
@@ -182,6 +244,8 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         // Update download page
         val intoDownloadMode = mode == MODE_DOWNLOAD
         if (intoDownloadMode && !downloadMode) {
+            downloadMode = true
+            finishing.set(false)
             // Clear download state
             synchronized(mPageStateLock) {
                 val temp: IntArray = mPageStateArray
@@ -199,7 +263,18 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
             }
             mWorkerScope.enterDownloadMode()
         }
-        downloadMode = intoDownloadMode
+    }
+
+    /** 阅读器仍占用同一个 Spider 时，仅撤销整部下载并等待其页写入和归档退出。 */
+    private fun leaveDownloadForReading(): Job = launch {
+        val jobs = synchronized(this@SpiderQueen) {
+            if (!downloadMode) return@launch
+            downloadMode = false
+            mSpiderDen.mode = MODE_READ
+            val jobs = mWorkerScope.leaveDownloadMode()
+            jobs + listOfNotNull(finishJob?.also { it.cancel() })
+        }
+        jobs.joinAll()
     }
 
     private fun resetStates() {
@@ -229,7 +304,16 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         check(!(mReadReference < 0 || mDownloadReference < 0)) { "Mode reference < 0" }
     }
 
-    private val prepareJob = launchIO { doPrepare() }
+    private val prepareJob = launchIO {
+        try {
+            doPrepare()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            // 保持父作用域可通知失败，目录撤权等异常不能让下载队列永久停在运行状态。
+            Log.e(TAG, "Cannot prepare gallery", error)
+        }
+    }
 
     private suspend fun doPrepare() {
         mSpiderDen.downloadDir = SpiderDen.getGalleryDownloadDir(galleryInfo.gid)?.takeIf { it.isDirectory }
@@ -243,20 +327,10 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         mOldDownloadDir = mSpiderInfo.upgradeFrom?.let { gid ->
             SpiderDen.getGalleryDownloadDir(gid)?.takeIf { it.isDirectory }
         }
-        mOldDownloadDir?.findFile(SPIDER_INFO_FILENAME)?.let { oldSpiderInfoFile ->
-            val oldSpiderInfo = readFromUniFile(oldSpiderInfoFile)
-            if (oldSpiderInfo != null && oldSpiderInfo.gid == mSpiderInfo.upgradeFrom) {
-                if (oldSpiderInfo.pTokenMap.size != oldSpiderInfo.pages) {
-                    getPTokenFromMultiPageViewer(
-                        oldSpiderInfo.gid,
-                        oldSpiderInfo.token!!,
-                        oldSpiderInfo,
-                    )
-                    if (oldSpiderInfo.pTokenMap.size == oldSpiderInfo.pages) {
-                        oldSpiderInfo.saveToUniFile(oldSpiderInfoFile)
-                    }
-                }
-                mOldHashMap = oldSpiderInfo.pTokenMap.entries.associateBy({ it.value }, { it.key }).toMutableMap()
+        mSpiderInfo.upgradeFrom?.let { oldGid ->
+            val oldInfo = readFromCache(oldGid)
+            if (oldInfo != null) {
+                mOldHashMap = oldInfo.pTokenMap.entries.associateBy({ it.value }, { it.key }).toMutableMap()
             }
         }
     }
@@ -272,10 +346,11 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         return mSpiderInfo.startPage
     }
 
-    private fun stop() {
+    private fun stop(): Job {
         val queenScope = this
-        launchIO {
-            queenScope.cancel()
+        // 独立收尾任务等待所有写文件/写库协程退出，删除操作可等待本任务，避免退出后重建位置。
+        return CoroutineScope(Dispatchers.IO).launch {
+            queenScope.coroutineContext[Job]!!.cancelAndJoin()
             runCatching {
                 writeSpiderInfoToLocal()
             }.onFailure {
@@ -371,16 +446,18 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
     fun putStartPage(page: Int) {
         mSpiderInfo.startPage = page
+        EhDB.putReadingState(galleryInfo.gid, page = page)
     }
 
-    private fun readSpiderInfoFromLocal(): SpiderInfo? = mSpiderDen.downloadDir?.run {
-        findFile(SPIDER_INFO_FILENAME)?.let { file ->
-            readFromUniFile(file)?.takeIf {
-                it.gid == galleryInfo.gid && it.token == galleryInfo.token
-            }
-        }
+    private fun readSpiderInfoFromLocal(): SpiderInfo? {
+        fun matches(info: SpiderInfo) = info.gid == galleryInfo.gid && info.token == galleryInfo.token
+        readFromCache(galleryInfo.gid)?.takeIf(::matches)?.let { return it }
+        val restored = DownloadStorage.container(galleryInfo.gid)?.let(DownloadStorage::readRecoveryInfo)?.takeIf(::matches) ?: return null
+        // 主库页码仍是权威值；回填续传快照后，下载准备阶段也能直接使用本地身份。
+        EhDB.getReadingState(galleryInfo.gid)?.let { restored.startPage = it.page.coerceIn(0, restored.pages - 1) }
+        restored.saveToCache()
+        return restored
     }
-        ?: readFromCache(galleryInfo.gid)?.takeIf { it.gid == galleryInfo.gid && it.token == galleryInfo.token }
 
     private suspend fun readSpiderInfoFromInternet(): SpiderInfo? {
         val url = EhUrl.getGalleryDetailUrl(
@@ -394,9 +471,12 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         return runSuspendCatching {
             plainTextOkHttpClient.newCall(request).executeAsync().use { response ->
                 val body = response.body.string()
-                val pages = GalleryDetailParser.parsePages(body)
+                val detail = GalleryDetailParser.parse(body)
+                EhDB.putGalleryMetadata(detail, url, EhCookieStore.getCookieValue(EhUrl.HOST_E.toHttpUrl(), EhCookieStore.KEY_IPB_MEMBER_ID))
+                val pages = detail.pages
                 val spiderInfo = SpiderInfo(galleryInfo.gid, galleryInfo.token, pages)
                 readPreviews(body, 0, spiderInfo)
+                spiderInfo.saveToCache()
                 spiderInfo
             }
         }.onFailure {
@@ -463,8 +543,8 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
     @Synchronized
     private fun writeSpiderInfoToLocal() {
         if (!isReady) return
-        mSpiderDen.downloadDir?.run { createFile(SPIDER_INFO_FILENAME)?.also { mSpiderInfo.saveToUniFile(it) } }
         mSpiderInfo.saveToCache()
+        DownloadStorage.saveRecoveryInfo(mSpiderInfo)
     }
 
     private fun isStateDone(state: Int): Boolean = state == STATE_FINISHED || state == STATE_FAILED
@@ -522,6 +602,8 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         private val mDownloadDelay = Settings.downloadDelay.milliseconds
         private val downloadTimeout = Settings.downloadTimeout.seconds
         private var lastRequestTime = TimeSource.Monotonic.markNow()
+
+        @Volatile
         private var isDownloadMode = false
 
         fun cancelDecode(index: Int) {
@@ -556,6 +638,14 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
                 mFetcherJobMap.forEach { (_, job) ->
                     job.cancel()
                 }
+                mFetcherJobMap.clear()
+            }
+        }
+
+        fun leaveDownloadMode(): List<Job> = synchronized(mFetcherJobMap) {
+            isDownloadMode = false
+            mFetcherJobMap.values.toList().also { jobs ->
+                jobs.forEach { it.cancel() }
                 mFetcherJobMap.clear()
             }
         }
@@ -607,7 +697,7 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
                 mOldDownloadDir?.let { oldDir ->
                     (mOldHashMap?.get(pToken) ?: mOldHashMap?.get(pToken.take(10)))?.let { oldIndex ->
-                        if (mSpiderDen.copyFromUniFileToDownloadDir(oldDir, oldIndex, index)) {
+                        if (mSpiderDen.copyFromUniFileToDownloadDir(oldDir, oldIndex, index) || mSpiderInfo.upgradeFrom?.let { mSpiderDen.copyFromArchive(it, oldIndex, index) } == true) {
                             return updatePageState(index, STATE_FINISHED)
                         }
                     }
@@ -759,7 +849,15 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
 
             private suspend fun doInJob(index: Int) {
                 mFetcherJobMap[index]?.takeIf { it.isActive }?.join()
-                val src = mSpiderDen.getImageSource(index) ?: return
+                val src = try {
+                    mSpiderDen.getImageSource(index) ?: return
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(TAG, "Cannot read gallery page", error)
+                    notifyGetImageFailure(index, READ_ERROR)
+                    return
+                }
                 val image = mSemaphore.withPermit { Image.decode(src) }
                 runCatching {
                     currentCoroutineContext().ensureActive()
@@ -784,15 +882,24 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
         const val STATE_DOWNLOADING = 1
         const val STATE_FINISHED = 2
         const val STATE_FAILED = 3
-        const val SPIDER_INFO_FILENAME = ".ehviewer"
+        const val SPIDER_INFO_FILENAME = ".ehreader"
         const val GET_FULL_HASH = true
         private val sQueenMap = LongSparseArray<SpiderQueen>()
+        private val stopping = mutableMapOf<Long, Job>()
         private val PTOKEN_FAILED_MESSAGE = GetText.getString(R.string.error_get_ptoken_error)
         private val ERROR_TIMEOUT = GetText.getString(R.string.error_timeout)
         private val DECODE_ERROR = GetText.getString(R.string.error_decoding_failed)
+        private val READ_ERROR = GetText.getString(R.string.error_reading_failed)
         private val URL_509_PATTERN = Regex("\\.org/.+/509s?\\.gif")
         private const val FORCE_RETRY = "Force retry"
         private const val WORKER_DEBUG_TAG = "SpiderQueenWorker"
+
+        @Synchronized
+        fun isInUse(gid: Long): Boolean = sQueenMap[gid]?.let { it.mReadReference > 0 || it.mDownloadReference > 0 } == true || stopping[gid]?.isCompleted == false
+
+        suspend fun awaitStopped(gid: Long) {
+            synchronized(this) { stopping[gid] }?.join()
+        }
 
         fun reset(gid: Long) {
             sQueenMap[gid]?.resetStates()
@@ -802,20 +909,37 @@ class SpiderQueen private constructor(val galleryInfo: GalleryInfo) : CoroutineS
             if (URL_509_PATTERN in url) throw QuotaExceededException()
         }
 
-        fun obtainSpiderQueen(galleryInfo: GalleryInfo, @Mode mode: Int): SpiderQueen {
-            val gid = galleryInfo.gid
-            return (sQueenMap[gid] ?: SpiderQueen(galleryInfo).also { sQueenMap[gid] = it }).apply {
-                setMode(mode)
-                launchIO { if (awaitReady()) updateMode() }
+        fun obtainSpiderQueen(galleryInfo: GalleryInfo, @Mode mode: Int): SpiderQueen = GalleryOperations.available(galleryInfo.gid) {
+            synchronized(this) { obtainAvailableQueen(galleryInfo, mode) }
+        } ?: throw java.io.IOException("Gallery is being maintained")
+
+        /** 删除或上次退出尚未完成时留在队首，其他异常仍交给调用方处理。 */
+        fun obtainDownloadQueenIfAvailable(info: GalleryInfo): SpiderQueen? = GalleryOperations.available(info.gid) {
+            synchronized(this) {
+                if (stopping[info.gid]?.isCompleted == false || sQueenMap[info.gid]?.downloadExit?.isCompleted == false) null else obtainAvailableQueen(info, MODE_DOWNLOAD)
             }
         }
 
+        private fun obtainAvailableQueen(galleryInfo: GalleryInfo, @Mode mode: Int): SpiderQueen {
+            val gid = galleryInfo.gid
+            check(stopping[gid]?.isCompleted != false) { "Gallery is stopping; retry shortly" }
+            return (sQueenMap[gid] ?: SpiderQueen(galleryInfo).also { sQueenMap[gid] = it }).apply {
+                setMode(mode)
+            }
+        }
+
+        @Synchronized
         fun releaseSpiderQueen(queen: SpiderQueen, @Mode mode: Int) {
             queen.run {
                 clearMode(mode)
                 if (mReadReference == 0 && mDownloadReference == 0) {
-                    stop()
+                    val gid = galleryInfo.gid
+                    val job = stop()
+                    stopping[gid] = job
+                    job.invokeOnCompletion { synchronized(this@Companion) { if (stopping[gid] === job) stopping.remove(gid) } }
                     sQueenMap.remove(galleryInfo.gid)
+                } else if (mode == MODE_DOWNLOAD) {
+                    downloadExit = leaveDownloadForReading()
                 } else {
                     launchIO { if (awaitReady()) updateMode() }
                 }

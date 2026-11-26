@@ -18,28 +18,32 @@
 package com.hippo.ehviewer.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Insert
 import androidx.room.Query
-import androidx.room.Update
+import androidx.room.Upsert
+
+internal const val RESET_INTERRUPTED_DOWNLOADS = "UPDATE DOWNLOADS SET STATE = 0 WHERE STATE IN (1, 2)"
 
 @Dao
-interface DownloadsDao : BasicDao<DownloadInfo> {
-    @Query("SELECT * FROM DOWNLOADS ORDER BY TIME DESC")
-    override fun list(): List<DownloadInfo>
+interface DownloadsDao {
+    /** 启动或无活动任务的备份重载时，将中断任务的真实存储状态恢复为暂停。 */
+    @Query(RESET_INTERRUPTED_DOWNLOADS)
+    fun resetInterruptedStates()
 
-    @Query("SELECT * FROM DOWNLOADS WHERE GID = :gid")
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.STATE, b.REMAINING_PAGES AS LEGACY, b.TIME, b.LABEL, b.FINISHED_PAGES, b.ATTEMPTED_PAGES, b.TOTAL_PAGES FROM DOWNLOADS b JOIN GALLERY_METADATA m ON m.GID = b.GID ORDER BY b.TIME DESC")
+    fun list(): List<DownloadInfo>
+
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.STATE, b.REMAINING_PAGES AS LEGACY, b.TIME, b.LABEL, b.FINISHED_PAGES, b.ATTEMPTED_PAGES, b.TOTAL_PAGES FROM DOWNLOADS b JOIN GALLERY_METADATA m ON m.GID = b.GID WHERE b.GID = :gid")
     fun load(gid: Long): DownloadInfo?
 
-    @Update
-    fun update(downloadInfos: List<DownloadInfo>)
+    @Upsert
+    fun put(record: DownloadRecord)
 
-    @Update
-    fun update(downloadInfo: DownloadInfo)
+    @Query("SELECT * FROM DOWNLOADS")
+    fun records(): List<DownloadRecord>
 
-    @Insert
-    override fun insert(t: DownloadInfo): Long
+    @Query("DELETE FROM DOWNLOADS WHERE GID = :gid")
+    fun deleteByKey(gid: Long)
 
-    @Delete
-    fun delete(downloadInfo: DownloadInfo)
+    @Query("SELECT * FROM DOWNLOADS WHERE GID = :gid")
+    fun record(gid: Long): DownloadRecord?
 }

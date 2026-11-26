@@ -44,6 +44,7 @@ import com.hippo.ehviewer.coil.DownloadThumbInterceptor
 import com.hippo.ehviewer.coil.MergeInterceptor
 import com.hippo.ehviewer.dao.buildMainDB
 import com.hippo.ehviewer.download.DownloadManager
+import com.hippo.ehviewer.download.DownloadStorage
 import com.hippo.ehviewer.ui.EhActivity
 import com.hippo.ehviewer.ui.keepNoMediaFileStatus
 import com.hippo.ehviewer.widget.SearchDatabase
@@ -128,6 +129,11 @@ class EhApplication :
     }
 
     private suspend fun cleanupDownload() {
+        runCatching {
+            DownloadStorage.clearReadCachesAtStartup()
+        }.onFailure {
+            Log.e(TAG, "Cannot initialize read cache cleanup", it)
+        }
         runCatching {
             keepNoMediaFileStatus()
         }.onFailure {

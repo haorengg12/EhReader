@@ -9,3 +9,9 @@
 release
 google-services.json
 /.kotlin
+
+# Signing material must remain outside version control.
+*.jks
+*.keystore
+/keystore.properties
+/signing.properties

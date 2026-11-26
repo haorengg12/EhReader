@@ -28,5 +28,5 @@ android {
 }
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
-rootProject.name = "EhViewer"
+rootProject.name = "EhReader"
 include(":app")

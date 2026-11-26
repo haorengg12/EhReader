@@ -1,0 +1,644 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "463e55a1304d769d1abce57050f91ddd",
+    "entities": [
+      {
+        "tableName": "GALLERY_METADATA",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `TOKEN` TEXT, `TITLE` TEXT, `TITLE_JPN` TEXT, `THUMB` TEXT, `CATEGORY` INTEGER, `POSTED` TEXT, `UPLOADER` TEXT, `RATING` REAL, `SIMPLE_LANGUAGE` TEXT, `SOURCE` TEXT, `DETAIL_URL` TEXT, `PARENT` TEXT, `VISIBLE` TEXT, `LANGUAGE` TEXT, `PAGES` INTEGER, `SIZE` TEXT, `FAVORITE_COUNT` INTEGER, `RATING_COUNT` INTEGER, `TORRENT_COUNT` INTEGER, `TORRENT_URL` TEXT, `TAGS` TEXT, `ACCOUNT_ID` TEXT, `ACCOUNT_SNAPSHOT` TEXT, `UPDATED_AT` INTEGER, `METADATA_STATE` TEXT NOT NULL, PRIMARY KEY(`GID`))",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "token",
+            "columnName": "TOKEN",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "TITLE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "titleJpn",
+            "columnName": "TITLE_JPN",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumb",
+            "columnName": "THUMB",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "CATEGORY",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "posted",
+            "columnName": "POSTED",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "uploader",
+            "columnName": "UPLOADER",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rating",
+            "columnName": "RATING",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "simpleLanguage",
+            "columnName": "SIMPLE_LANGUAGE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "SOURCE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "detailUrl",
+            "columnName": "DETAIL_URL",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "parent",
+            "columnName": "PARENT",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "visible",
+            "columnName": "VISIBLE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "language",
+            "columnName": "LANGUAGE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "pages",
+            "columnName": "PAGES",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "size",
+            "columnName": "SIZE",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "favoriteCount",
+            "columnName": "FAVORITE_COUNT",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "ratingCount",
+            "columnName": "RATING_COUNT",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "torrentCount",
+            "columnName": "TORRENT_COUNT",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "torrentUrl",
+            "columnName": "TORRENT_URL",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tags",
+            "columnName": "TAGS",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "accountId",
+            "columnName": "ACCOUNT_ID",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "accountSnapshot",
+            "columnName": "ACCOUNT_SNAPSHOT",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "UPDATED_AT",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "metadataState",
+            "columnName": "METADATA_STATE",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        }
+      },
+      {
+        "tableName": "READING_STATE",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `PAGE` INTEGER NOT NULL, `SPIDER_INFO` BLOB, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "page",
+            "columnName": "PAGE",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "spiderInfo",
+            "columnName": "SPIDER_INFO",
+            "affinity": "BLOB"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "BOOKMARKS",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `PAGE` INTEGER NOT NULL, `TIME` INTEGER NOT NULL, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "page",
+            "columnName": "PAGE",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "DOWNLOADS",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `STATE` INTEGER NOT NULL, `REMAINING_PAGES` INTEGER NOT NULL, `TIME` INTEGER NOT NULL, `LABEL` TEXT, `LEGACY_DOWNLOAD_PATH` TEXT, `FINISHED_PAGES` INTEGER NOT NULL, `ATTEMPTED_PAGES` INTEGER NOT NULL, `TOTAL_PAGES` INTEGER NOT NULL, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "STATE",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remainingPages",
+            "columnName": "REMAINING_PAGES",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "LABEL",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "legacyDownloadPath",
+            "columnName": "LEGACY_DOWNLOAD_PATH",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "finishedPages",
+            "columnName": "FINISHED_PAGES",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "attemptedPages",
+            "columnName": "ATTEMPTED_PAGES",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "totalPages",
+            "columnName": "TOTAL_PAGES",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_DOWNLOADS_TIME",
+            "unique": false,
+            "columnNames": [
+              "TIME"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_DOWNLOADS_TIME` ON `${TABLE_NAME}` (`TIME`)"
+          },
+          {
+            "name": "index_DOWNLOADS_LABEL",
+            "unique": false,
+            "columnNames": [
+              "LABEL"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_DOWNLOADS_LABEL` ON `${TABLE_NAME}` (`LABEL`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "DOWNLOAD_LABELS",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`_id` INTEGER, `LABEL` TEXT, `TIME` INTEGER NOT NULL, PRIMARY KEY(`_id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "label",
+            "columnName": "LABEL",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "_id"
+          ]
+        }
+      },
+      {
+        "tableName": "DOWNLOAD_LOCATIONS",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `DIRNAME` TEXT, `ROOT_URI` TEXT, `ACTUAL_PATH` TEXT, `TEMP_PATH` TEXT, `FORMAT` TEXT NOT NULL, `PHASE` TEXT NOT NULL, `EXPECTED_PAGES` INTEGER NOT NULL, `LAST_ERROR` TEXT, `MANIFEST` TEXT, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dirname",
+            "columnName": "DIRNAME",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rootUri",
+            "columnName": "ROOT_URI",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "actualPath",
+            "columnName": "ACTUAL_PATH",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "tempPath",
+            "columnName": "TEMP_PATH",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "format",
+            "columnName": "FORMAT",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "phase",
+            "columnName": "PHASE",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expectedPages",
+            "columnName": "EXPECTED_PAGES",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastError",
+            "columnName": "LAST_ERROR",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "manifest",
+            "columnName": "MANIFEST",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "FILTER",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`MODE` INTEGER NOT NULL, `TEXT` TEXT, `ENABLE` INTEGER, `_id` INTEGER, PRIMARY KEY(`_id`))",
+        "fields": [
+          {
+            "fieldPath": "mode",
+            "columnName": "MODE",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "text",
+            "columnName": "TEXT",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "enable",
+            "columnName": "ENABLE",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "_id",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "_id"
+          ]
+        }
+      },
+      {
+        "tableName": "HISTORY",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `TIME` INTEGER NOT NULL, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_HISTORY_TIME",
+            "unique": false,
+            "columnNames": [
+              "TIME"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_HISTORY_TIME` ON `${TABLE_NAME}` (`TIME`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "LOCAL_FAVORITES",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`GID` INTEGER NOT NULL, `TIME` INTEGER NOT NULL, PRIMARY KEY(`GID`), FOREIGN KEY(`GID`) REFERENCES `GALLERY_METADATA`(`GID`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "gid",
+            "columnName": "GID",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "GID"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_LOCAL_FAVORITES_TIME",
+            "unique": false,
+            "columnNames": [
+              "TIME"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_LOCAL_FAVORITES_TIME` ON `${TABLE_NAME}` (`TIME`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "GALLERY_METADATA",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "GID"
+            ],
+            "referencedColumns": [
+              "GID"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "QUICK_SEARCH",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`_id` INTEGER, `NAME` TEXT, `MODE` INTEGER NOT NULL, `CATEGORY` INTEGER NOT NULL, `KEYWORD` TEXT, `ADVANCE_SEARCH` INTEGER NOT NULL, `MIN_RATING` INTEGER NOT NULL, `PAGE_FROM` INTEGER NOT NULL, `PAGE_TO` INTEGER NOT NULL, `TIME` INTEGER NOT NULL, PRIMARY KEY(`_id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "_id",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "NAME",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "mode",
+            "columnName": "MODE",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "category",
+            "columnName": "CATEGORY",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyword",
+            "columnName": "KEYWORD",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "advanceSearch",
+            "columnName": "ADVANCE_SEARCH",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "minRating",
+            "columnName": "MIN_RATING",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageFrom",
+            "columnName": "PAGE_FROM",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pageTo",
+            "columnName": "PAGE_TO",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "time",
+            "columnName": "TIME",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "_id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '463e55a1304d769d1abce57050f91ddd')"
+    ]
+  }
+}

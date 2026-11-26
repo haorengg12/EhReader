@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_delete_report">删除成功：%1$d；跳过：%2$d；失败：%3$d</string>
+    <string name="download_delete_skipped">正在使用或已删除。请关闭阅读器后重试。</string>
+    <string name="download_delete_database_failed">文件已删除，但数据库提交失败。记录已保留，请重试删除。</string>
+    <string name="download_delete_partial">文件可能部分删除。记录已保留，请重试删除。</string>
+    <string name="download_delete_failed">删除失败。记录已保留，请检查目录权限后重试。</string>
+</resources>

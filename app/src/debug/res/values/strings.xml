@@ -17,6 +17,6 @@
 
 <resources>
 
-    <string name="app_name" translatable="false">EhViewer Debug</string>
+    <string name="app_name" translatable="false">EhReader Debug</string>
 
 </resources>

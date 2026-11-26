@@ -53,6 +53,7 @@ class GalleryInfoScene : ToolbarScene() {
 
     private fun handlerArgs(args: Bundle?) {
         args?.getParcelableCompat<GalleryDetail>(KEY_GALLERY_DETAIL)?.let {
+            val local = if (args.getBoolean(KEY_LOCAL_METADATA)) com.hippo.ehviewer.EhDB.getGalleryMetadata(it.gid) else null
             mKeys.add(getString(R.string.header_key))
             mValues.add(getString(R.string.header_value))
             mKeys.add(getString(R.string.key_gid))
@@ -60,15 +61,15 @@ class GalleryInfoScene : ToolbarScene() {
             mKeys.add(getString(R.string.key_token))
             mValues.add(it.token)
             mKeys.add(getString(R.string.key_url))
-            mValues.add(EhUrl.getGalleryDetailUrl(it.gid, it.token))
+            mValues.add(com.hippo.ehviewer.EhDB.getGalleryMetadata(it.gid)?.detailUrl)
             mKeys.add(getString(R.string.key_title))
             mValues.add(it.title)
             mKeys.add(getString(R.string.key_title_jpn))
             mValues.add(it.titleJpn)
             mKeys.add(getString(R.string.key_thumb))
-            mValues.add(it.thumbUrl!!)
+            mValues.add(it.thumbUrl)
             mKeys.add(getString(R.string.key_category))
-            mValues.add(EhUtils.getCategory(it.category))
+            mValues.add(if (local != null && local.category == null) null else EhUtils.getCategory(it.category))
             mKeys.add(getString(R.string.key_uploader))
             mValues.add(it.uploader)
             mKeys.add(getString(R.string.key_posted))
@@ -80,21 +81,21 @@ class GalleryInfoScene : ToolbarScene() {
             mKeys.add(getString(R.string.key_language))
             mValues.add(it.language)
             mKeys.add(getString(R.string.key_pages))
-            mValues.add(it.pages.toString())
+            mValues.add(if (local != null && local.pages == null) null else it.pages.toString())
             mKeys.add(getString(R.string.key_size))
             mValues.add(it.size)
             mKeys.add(getString(R.string.key_favorite_count))
-            mValues.add(it.favoriteCount.toString())
+            mValues.add(if (local != null && local.favoriteCount == null) null else it.favoriteCount.toString())
             mKeys.add(getString(R.string.key_favorited))
-            mValues.add(java.lang.Boolean.toString(it.isFavorited))
+            mValues.add(if (local != null && (local.accountSnapshot == null || local.accountId != com.hippo.ehviewer.EhDB.currentAccount())) null else it.isFavorited.toString())
             mKeys.add(getString(R.string.key_favorite_name))
             mValues.add(it.favoriteName)
             mKeys.add(getString(R.string.key_rating_count))
-            mValues.add(it.ratingCount.toString())
+            mValues.add(if (local != null && local.ratingCount == null) null else it.ratingCount.toString())
             mKeys.add(getString(R.string.key_rating))
-            mValues.add(it.rating.toString())
+            mValues.add(if (it.rating.isFinite()) it.rating.toString() else null)
             mKeys.add(getString(R.string.key_torrents))
-            mValues.add(it.torrentCount.toString())
+            mValues.add(if (local != null && local.torrentCount == null) null else it.torrentCount.toString())
             mKeys.add(getString(R.string.key_torrent_url))
             mValues.add(it.torrentUrl)
         }
@@ -209,6 +210,7 @@ class GalleryInfoScene : ToolbarScene() {
 
     companion object {
         const val KEY_GALLERY_DETAIL = "gallery_detail"
+        const val KEY_LOCAL_METADATA = "local_metadata"
         const val KEY_KEYS = "keys"
         const val KEY_VALUES = "values"
         private const val INDEX_URL = 3

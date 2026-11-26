@@ -42,6 +42,11 @@
         android:title="@string/settings_advanced" />
 
     <Preference
+        android:key="compatibility"
+        android:icon="@drawable/v_history_black_x24"
+        android:title="@string/settings_compatibility" />
+
+    <Preference
         android:key="about"
         android:icon="@drawable/v_info_primary_x24"
         android:title="@string/settings_about" />

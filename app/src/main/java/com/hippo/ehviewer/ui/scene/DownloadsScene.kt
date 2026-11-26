@@ -44,7 +44,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
+import androidx.room.InvalidationTracker
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar.LENGTH_LONG
 import com.hippo.app.CheckBoxDialogBuilder
 import com.hippo.app.EditTextDialogBuilder
 import com.hippo.easyrecyclerview.EasyRecyclerView
@@ -54,18 +56,22 @@ import com.hippo.easyrecyclerview.FastScroller.OnDragHandlerListener
 import com.hippo.easyrecyclerview.HandlerDrawable
 import com.hippo.easyrecyclerview.LinearDividerItemDecoration
 import com.hippo.easyrecyclerview.MarginItemDecoration
+import com.hippo.ehviewer.EhApplication
 import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.R
 import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.client.getThumbKey
 import com.hippo.ehviewer.dao.DownloadInfo
+import com.hippo.ehviewer.download.DownloadFilter
+import com.hippo.ehviewer.download.DownloadFilterStore
 import com.hippo.ehviewer.download.DownloadManager
 import com.hippo.ehviewer.download.DownloadManager.DownloadInfoListener
 import com.hippo.ehviewer.download.DownloadService
 import com.hippo.ehviewer.download.DownloadService.Companion.clear
 import com.hippo.ehviewer.spider.DownloadInfoMagics.encodeMagicRequest
 import com.hippo.ehviewer.spider.SpiderDen
+import com.hippo.ehviewer.ui.DownloadFilterDialog
 import com.hippo.ehviewer.ui.GalleryActivity
 import com.hippo.ehviewer.widget.SimpleRatingView
 import com.hippo.scene.Announcer
@@ -84,6 +90,11 @@ import com.hippo.yorozuya.ObjectUtils
 import com.hippo.yorozuya.ViewUtils
 import com.hippo.yorozuya.collect.LongList
 import java.util.LinkedList
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import rikka.core.res.resolveColor
 
 @SuppressLint("RtlHardcoded")
@@ -109,6 +120,14 @@ class DownloadsScene :
     private var mSort = Settings.defaultSortingMethod
     private var mType = -1
     private var mInitPosition = -1
+    private var offlineFilter: DownloadFilter? = null
+    private var offlineQuery: Job? = null
+    private var offlineDirty = false
+    private val offlineObserver = object : InvalidationTracker.Observer("DOWNLOADS", "GALLERY_METADATA", "DOWNLOAD_TAG", "DOWNLOAD_TAG_STAT") {
+        override fun onInvalidated(tables: Set<String>) {
+            lifecycleScope.launch(Dispatchers.Main) { refreshOffline() }
+        }
+    }
 
     override fun getNavCheckedItem(): Int = R.id.nav_downloads
 
@@ -133,6 +152,8 @@ class DownloadsScene :
         val gid = args.getLong(KEY_GID, -1L)
         if (-1L != gid) {
             DownloadManager.getDownloadInfo(gid)?.let {
+                offlineFilter = null
+                offlineQuery?.cancel()
                 mLabel = it.label
                 updateForLabel()
                 updateView()
@@ -174,6 +195,12 @@ class DownloadsScene :
 
     @SuppressLint("NotifyDataSetChanged")
     private fun updateForLabel() {
+        if (offlineFilter != null) {
+            refreshOffline(replace = true)
+            updateTitle()
+            Settings.putRecentDownloadLabel(mLabel)
+            return
+        }
         var list: MutableList<DownloadInfo>?
         if (mLabel == null) {
             list = DownloadManager.allDownloadInfoList
@@ -227,12 +254,12 @@ class DownloadsScene :
     }
 
     private fun updateTitle() {
-        setTitle(
-            getString(
-                R.string.scene_download_title,
-                if (mLabel != null) mLabel else getString(R.string.download_all),
-            ),
-        )
+        val scope = if (offlineFilter != null || mType != -1) {
+            getString(R.string.download_filter)
+        } else {
+            mLabel ?: getString(R.string.download_all)
+        }
+        setTitle(getString(R.string.scene_download_title, scope))
     }
 
     private fun onInit() {
@@ -244,12 +271,16 @@ class DownloadsScene :
 
     private fun onRestore(savedInstanceState: Bundle) {
         mLabel = savedInstanceState.getString(KEY_LABEL)
+        @Suppress("DEPRECATION")
+        offlineFilter = savedInstanceState.getParcelable("offline_filter")
+        if (offlineFilter != null) return
         updateForLabel()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(KEY_LABEL, mLabel)
+        outState.putParcelable("offline_filter", offlineFilter)
     }
 
     override fun onCreateViewWithToolbar(
@@ -314,9 +345,13 @@ class DownloadsScene :
         super.onViewCreated(view, savedInstanceState)
         updateTitle()
         setNavigationIcon(R.drawable.ic_baseline_menu_24)
+        EhApplication.ehDatabase.invalidationTracker.addObserver(offlineObserver)
+        refreshOffline()
     }
 
     override fun onDestroyView() {
+        EhApplication.ehDatabase.invalidationTracker.removeObserver(offlineObserver)
+        offlineQuery?.cancel()
         super.onDestroyView()
         if (null != mRecyclerView) {
             mRecyclerView!!.stopScroll()
@@ -345,7 +380,15 @@ class DownloadsScene :
             return false
         }
         when (item.itemId) {
+            R.id.action_offline_filter -> {
+                showOfflineFilter()
+                return true
+            }
             R.id.action_filter -> {
+                if (offlineFilter != null) {
+                    showOfflineFilter()
+                    return true
+                }
                 AlertDialog.Builder(requireActivity())
                     .setSingleChoiceItems(
                         R.array.download_state,
@@ -407,6 +450,10 @@ class DownloadsScene :
                 return true
             }
             R.id.action_sort -> {
+                if (offlineFilter != null) {
+                    showOfflineFilter()
+                    return true
+                }
                 AlertDialog.Builder(requireActivity())
                     .setSingleChoiceItems(
                         R.array.download_sort,
@@ -422,6 +469,67 @@ class DownloadsScene :
                 return true
             }
             else -> return false
+        }
+    }
+
+    private fun showOfflineFilter() {
+        if (mRecyclerView?.isInCustomChoice == true) return
+        DownloadFilterDialog(
+            requireContext(),
+            viewLifecycleOwner.lifecycleScope,
+            offlineFilter ?: DownloadFilter(title = mKeyword.orEmpty(), state = mType.takeIf { it in 0..4 }),
+            mLabel ?: getString(R.string.download_all),
+        ) { filter ->
+            offlineQuery?.cancel()
+            offlineFilter = filter
+            mType = -1
+            mKeyword = null
+            updateForLabel()
+            updateView()
+        }.show()
+    }
+
+    /** 异步读取全部筛选结果；多选期间冻结 GID 顺序，退出后应用后台变化。 */
+    @SuppressLint("NotifyDataSetChanged")
+    private fun refreshOffline(replace: Boolean = false) {
+        val filter = offlineFilter ?: return
+        if (view == null) return
+        offlineDirty = true
+        if (mRecyclerView?.isInCustomChoice == true) return
+        if (replace) {
+            offlineQuery?.cancel()
+        } else if (offlineQuery?.isActive == true) {
+            return
+        }
+        if (replace) {
+            mList = ArrayList()
+            mAdapter?.notifyDataSetChanged()
+        }
+        offlineQuery = viewLifecycleOwner.lifecycleScope.launch {
+            var resetScroll = replace
+            do {
+                delay(if (resetScroll) 0 else 500)
+                offlineDirty = false
+                try {
+                    val gids = DownloadFilterStore.gids(filter, mLabel != null, mLabel.takeUnless { it == getString(R.string.default_download_label_name) })
+                    if (mRecyclerView?.isInCustomChoice == true) {
+                        offlineDirty = true
+                        break
+                    }
+                    val matches = gids.mapNotNullTo(ArrayList(gids.size), DownloadManager::getDownloadInfo)
+                    mList = matches
+                    mAdapter?.notifyDataSetChanged()
+                    if (resetScroll) mRecyclerView?.scrollToPosition(0)
+                    resetScroll = false
+                    updateView()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    android.util.Log.e("DownloadsScene", "Offline filter query failed", e)
+                    showTip(R.string.offline_filter_failed, LENGTH_LONG)
+                    break
+                }
+            } while (offlineDirty)
         }
     }
 
@@ -451,6 +559,7 @@ class DownloadsScene :
     }
 
     fun updateView() {
+        mTip?.setText(if (offlineFilter == null) R.string.no_download_info else R.string.offline_filter_empty_results)
         if (mList.isNullOrEmpty()) {
             mViewTransition?.showView(1)
         } else {
@@ -650,6 +759,10 @@ class DownloadsScene :
     }
 
     override fun onAdd(info: DownloadInfo, list: List<DownloadInfo>, position: Int) {
+        if (offlineFilter != null) {
+            refreshOffline()
+            return
+        }
         if (mList !== list) {
             return
         }
@@ -669,11 +782,20 @@ class DownloadsScene :
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onUpdateAll() {
+        if (offlineFilter != null) {
+            refreshOffline()
+            return
+        }
         mAdapter?.notifyDataSetChanged()
     }
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onReload() {
+        if (offlineFilter != null) {
+            refreshOffline()
+            return
+        }
+        updateForLabel()
         mAdapter?.notifyDataSetChanged()
         updateView()
     }
@@ -696,6 +818,10 @@ class DownloadsScene :
     }
 
     override fun onRemove(info: DownloadInfo, list: List<DownloadInfo>, position: Int) {
+        if (offlineFilter != null) {
+            refreshOffline()
+            return
+        }
         if (mList !== list) {
             return
         }
@@ -753,7 +879,7 @@ class DownloadsScene :
             holder.stop.visibility = View.GONE
         }
         holder.state.text = state
-        if (mSort == 0 && mType == -1) {
+        if (offlineFilter == null && mSort == 0 && mType == -1) {
             holder.move.visibility = View.VISIBLE
         } else {
             holder.move.visibility = View.GONE
@@ -924,27 +1050,10 @@ class DownloadsScene :
                 mRecyclerView!!.outOfCustomChoiceMode()
             }
 
-            // Delete
-            // DownloadManager Actions
-            DownloadManager.deleteRangeDownload(mGidList)
-
-            // Delete image files
             val checked = mBuilder.isChecked
             Settings.putRemoveImageFiles(checked)
-            if (checked) {
-                val files = arrayOfNulls<UniFile>(mDownloadInfoList.size)
-                for ((i, info) in mDownloadInfoList.withIndex()) {
-                    // Put file
-                    files[i] = SpiderDen.getGalleryDownloadDir(info.gid)
-                    // DB Actions
-                    DownloadManager.removeDownloadDirname(info.gid)
-                }
-                // Other Actions
-                lifecycleScope.launchIO {
-                    runCatching {
-                        files.forEach { it?.delete() }
-                    }
-                }
+            DownloadManager.deleteRangeDownload(mGidList, checked) { message ->
+                context?.let { AlertDialog.Builder(it).setMessage(message).setPositiveButton(android.R.string.ok, null).show() }
             }
         }
     }
@@ -1149,6 +1258,7 @@ class DownloadsScene :
         }
 
         override fun onOutOfCustomChoice(view: EasyRecyclerView) {
+            refreshOffline()
             if (mFabLayout != null) {
                 mFabLayout!!.isExpanded = false
             }
@@ -1275,7 +1385,7 @@ class DownloadsScene :
             recyclerView: RecyclerView,
             viewHolder: RecyclerView.ViewHolder,
         ): Int = makeMovementFlags(
-            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+            if (offlineFilter == null) ItemTouchHelper.UP or ItemTouchHelper.DOWN else 0,
             0,
         )
 
@@ -1288,7 +1398,7 @@ class DownloadsScene :
         ): Boolean {
             val fromPosition = viewHolder.bindingAdapterPosition
             val toPosition = target.bindingAdapterPosition
-            if (fromPosition == toPosition) {
+            if (offlineFilter != null || fromPosition == toPosition) {
                 return false
             }
             // DownloadManager Actions

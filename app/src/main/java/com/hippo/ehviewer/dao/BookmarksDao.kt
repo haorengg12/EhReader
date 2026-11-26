@@ -18,18 +18,23 @@
 package com.hippo.ehviewer.dao
 
 import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Upsert
 
 @Dao
-interface BookmarksDao : BasicDao<BookmarkInfo> {
-    @Insert
-    override fun insert(t: BookmarkInfo): Long
+interface BookmarksDao {
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.PAGE, b.TIME FROM BOOKMARKS b JOIN GALLERY_METADATA m ON m.GID = b.GID ORDER BY b.TIME DESC")
+    fun list(): List<BookmarkInfo>
 
-    @Delete
-    fun delete(bookmark: BookmarkInfo)
+    @Query("SELECT " + GALLERY_COLUMNS + ", b.PAGE, b.TIME FROM BOOKMARKS b JOIN GALLERY_METADATA m ON m.GID = b.GID WHERE b.GID = :gid")
+    fun load(gid: Long): BookmarkInfo?
 
-    @Query("SELECT * FROM BOOKMARKS ORDER BY TIME DESC")
-    override fun list(): List<BookmarkInfo>
+    @Upsert
+    fun put(record: BookmarkRecord)
+
+    @Query("SELECT * FROM BOOKMARKS")
+    fun records(): List<BookmarkRecord>
+
+    @Query("DELETE FROM BOOKMARKS WHERE GID = :gid")
+    fun deleteByKey(gid: Long)
 }

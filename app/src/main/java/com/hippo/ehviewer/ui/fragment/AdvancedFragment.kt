@@ -220,6 +220,7 @@ class AdvancedFragment : BasePreferenceFragment() {
                             alertDialog.dismiss()
                         }
                         if (null == error) {
+                            com.hippo.ehviewer.download.DownloadManager.reloadFromDatabase()
                             showTip(
                                 getString(R.string.settings_advanced_import_data_successfully),
                                 BaseScene.LENGTH_SHORT,

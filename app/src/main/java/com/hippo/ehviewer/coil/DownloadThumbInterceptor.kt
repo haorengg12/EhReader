@@ -35,7 +35,7 @@ object DownloadThumbInterceptor : Interceptor {
             val (url, location) = decodeMagicRequestOrUrl(magicOrUrl)
             if (location != null) {
                 return withIOContext {
-                    val thumb = downloadLocation?.subFile(location)?.subFile(THUMB_FILE)
+                    val thumb = location.toLongOrNull()?.let { com.hippo.ehviewer.download.DownloadStorage.container(it)?.let { dir -> dir.findFile(THUMB_FILE) ?: dir.subFile(THUMB_FILE) } }
                     if (thumb?.isFile == true) {
                         val new = chain.request.newBuilder().data(thumb.uri).build()
                         val result = chain.withRequest(new).proceed()

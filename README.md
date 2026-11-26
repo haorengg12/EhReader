@@ -1,115 +1,56 @@
-<p align="right">
-  <strong>English</strong>
-  <span> | </span>
-  <a href="/docs/README/zh-cn.md">
-  简体中文
-  </a>
-</p>
+# EhReader
 
-<h1 align="center">
-  <img src="https://github.com/EhViewer-NekoInverter/Arts/blob/main/launcher_icon-web.webp" width="150" alt="EhViewer">
-  <br>EhViewer<br>
-</h1>
+EhReader 是 haorengg12 维护的 EhViewer 衍生项目，初始化版本为 **0.1.0 (100)**。
+开发仓库为 [haorengg12/EhReader](https://github.com/haorengg12/EhReader)，默认分支为 `master`，开发分支为 `develop`。
 
-<p align="center">
-  <a href="https://github.com/EhViewer-NekoInverter/EhViewer/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/EhViewer-NekoInverter/EhViewer/ci.yml?style=flat-square" alt="Github Actions">
-  </a>
-  <a href="/LICENSE">
-    <img src="https://img.shields.io/github/license/EhViewer-NekoInverter/EhViewer?style=flat-square" alt="LICENSE">
-  </a>
-  <a href="https://github.com/EhViewer-NekoInverter/Ehviewer/releases">
-    <img src="https://img.shields.io/github/v/release/EhViewer-NekoInverter/Ehviewer?style=flat-square&include_prereleases" alt="Releases">
-  </a>
-  <a href="https://github.com/EhViewer-NekoInverter/EhViewer/issues">
-    <img src="https://img.shields.io/github/issues/EhViewer-NekoInverter/EhViewer?style=flat-square" alt="Issues">
-  </a>
-</p>
+基于 [EhViewer-NekoInverter/EhViewer](https://github.com/EhViewer-NekoInverter/EhViewer)
+提交 `9e1021640472ee45f35c0bb1950723db08549b9e`，保留完整 Git 历史。
+[原始 README](docs/README.upstream.md) 按基线保存，其中下载、徽章和链接属于上游项目。
 
-<div align="center">
-  <h3>
-    <a href="#description">
-    Description
-    </a>
-    <span> | </span>
-    <a href="#download">
-    Download
-    </a>
-    <span> | </span>
-    <a href="#screenshot">
-    Screenshot
-    </a>
-    <span> | </span>
-    <a href="#thanks">
-    Thanks
-    </a>
-    <span> | </span>
-    <a href="#license">
-    License
-    </a>
-  </h3>
-</div>
+## 应用标识与版本
 
-# Description
+- applicationId：`com.haorengg12.ehreader`；debug：`com.haorengg12.ehreader.debug`。
+- namespace 保留 `com.hippo.ehviewer`，与安装包名独立。
+- 当前 versionName：`1.8.15`；versionCode：`10815`，以 [app/build.gradle.kts](app/build.gradle.kts) 为唯一来源。
+- 本次按用户指定对齐为 `1.8.15`，便于记忆原仓库 `v1.8.14` 之后的改动；此标识不改写上方实际源码基线或既有发行历史。
+- 新包名从 100 独立计数，每次发布（包括预发布）必须使用更大的 versionCode，不复用旧值。
 
-An EhViewer fork with classic Material Design 2 style
+## 构建与签名
 
-This fork is for personal use and does not accept feature requests; for common usage issues, please refer to the [Q&A](https://github.com/EhViewer-NekoInverter/EhViewer/issues/18)
+需要 JDK 21、Android SDK 36、Build Tools 36.0.0、NDK 29.0.14206865 和 CMake。
+本地检查和 Debug 打包按仓库内[本地开发规范](.agents/docs/LOCAL_DEVELOPMENT.md) 选择。本地使用仓库外的 Docker 入口，临时配置仅应用于容器源码副本；正式包由 CI/CD 构建：
 
-If you prefer Material Design 3, consider using [EhViewer-Overhauled](https://github.com/FooIbar/EhViewer)
+```powershell
+$repo = (Get-Location).Path
+$output = Join-Path (Split-Path $repo -Parent) 'temp/docker-build'
+& '../build-tools/ehreader-docker/build.ps1' -Source $repo -OutputRoot $output -OfflineDependencies
+```
 
-# Download
+本地 SDK 使用 Docker 镜像内的 Linux 工具链；缓存与入口条件见本地开发规范。
+未配置签名时 Release 为 **unsigned** 产物，不能直接安装或作为正式发行包。
+Debug 使用 Android 标准调试签名，仅用于开发。
+本地默认仅构建 arm64-v8a；GitHub Actions 构建 arm64-v8a、armeabi-v7a、x86_64 和 universal，Debug/Release 均遵守这一架构划分。
 
-| Android Version | Notes                        |
-|-----------------|------------------------------|
-| 6.0-8.1         | No support for animated WebP |
-| 9.0+            | Full support                 |
+正式签名由 CI/CD 的受保护凭据提供以下环境变量，私钥和密码不得进入 Git 或公开日志：
 
-- Please go to **[GitHub Releases](https://github.com/EhViewer-NekoInverter/EhViewer/releases)** to download the release version
+| 环境变量 | 含义 |
+| --- | --- |
+| `EHREADER_KEYSTORE_PATH` | 仓库外的私有 keystore 绝对路径 |
+| `EHREADER_STORE_PASSWORD` | keystore 密码 |
+| `EHREADER_KEY_ALIAS` | 签名密钥别名 |
+| `EHREADER_KEY_PASSWORD` | 密钥密码 |
 
-- If the release version has unresolved issues, go to **[GitHub Actions](https://github.com/EhViewer-NekoInverter/EhViewer/actions/workflows/ci.yml?query=branch%3Amaster)** to download the CI version (GitHub account login required)
+部分配置或无效 keystore 路径会使构建失败。不要将私钥、密码或含密码的配置提交到 Git。
+已移除当前源码树中的上游公开 keystore 与硬编码密码；为保留历史，旧提交仍含该公开密钥。
+它不得用于 EhReader 正式签名，必须新建并妥善备份独立私钥。
 
-# Screenshot
+开发先读 [AGENTS.md](AGENTS.md) 和[流程导航](.agents/docs/DEVELOPMENT_FLOW.md)，按阶段读取规范。版本算法、基础验证/打包分流和实际部署状态以[发布规范](.agents/docs/RELEASE_POLICY.md)为唯一来源；本地实现和远端验收分别记录。正式签名及端到端结论以实际证据为准，保留既有发行历史。
 
-![screenshot-01](https://github.com/EhViewer-NekoInverter/Arts/blob/main/screenshot-01.webp)
-![screenshot-02](https://github.com/EhViewer-NekoInverter/Arts/blob/main/screenshot-02.webp)
+开发规范位于仓库内 `.agents/docs`，随对应提交纳入版本管理；仓库内 `docs` 保留 README、CHANGELOG 和上游 README。工作区 `release` 存放本地 arm64-v8a 产物，`temp` 存放临时文件，`trash` 回收废弃文件或目录，详见[目录约定](.agents/docs/LOCAL_DEVELOPMENT.md#工作区目录约定)。
 
-# Thanks
+## 许可证与版权
 
-Here are the libraries
-
-- [AOSP & AndroidX](https://source.android.com/)
-- [Kotlin & KotlinX](https://kotlinlang.org/)
-- [Coil](https://coil-kt.github.io/coil/)
-- [FullDraggableDrawer](https://github.com/PureWriter/FullDraggableDrawer)
-- [Jsoup](https://jsoup.org/)
-- [Ktor](https://ktor.io/)
-- [Libarchive](http://www.libarchive.org/)
-- [MDC-Android](https://github.com/material-components/material-components-android)
-- [OkHttp](https://square.github.io/okhttp/)
-- [RikkaX](https://github.com/RikkaApps/RikkaX)
-
-Tag translation
-
-- [EhTagTranslation](https://github.com/EhTagTranslation/Database)
-
-Translators
-
-- ja: [Re*Index. (ot_inc)](https://github.com/reindex-ot)
-
-# License
-
-    Copyright 2014-2019 Hippo Seven
-    Copyright 2020-2022 NekoInverter
-    Copyright 2022-2025 Moedog
-
-    EhViewer is free software:
-    you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation,
-    either version 3 of the License, or (at your option) any later version.
-
-    EhViewer is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-    See the GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License along with EhViewer.
-    If not, see <https://www.gnu.org/licenses/>.
+本项目按 [GNU GPLv3](LICENSE) 分发。所有上游版权、文件许可证和第三方声明保持有效，
+详见 [NOTICE](NOTICE) 及源码文件头；haorengg12 不主张上游代码的版权。
+Copyright (C) 2026 haorengg12 仅适用于新增原创修改。
+分发二进制时应同时提供相应版本的完整对应源码、构建说明及许可证，并履行 GPLv3 义务。

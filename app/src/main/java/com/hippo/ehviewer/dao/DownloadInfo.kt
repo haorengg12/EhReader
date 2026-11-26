@@ -19,13 +19,11 @@ package com.hippo.ehviewer.dao
 
 import android.annotation.SuppressLint
 import androidx.room.ColumnInfo
-import androidx.room.Entity
 import androidx.room.Ignore
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
 import com.hippo.ehviewer.client.data.GalleryInfo
 
 @SuppressLint("ParcelCreator")
-@Entity(tableName = "DOWNLOADS")
 class DownloadInfo() : BaseGalleryInfo() {
     @ColumnInfo(name = "STATE")
     var state = 0
@@ -45,13 +43,13 @@ class DownloadInfo() : BaseGalleryInfo() {
     @Ignore
     var remaining: Long = 0
 
-    @Ignore
+    @ColumnInfo(name = "FINISHED_PAGES")
     var finished = 0
 
-    @Ignore
+    @ColumnInfo(name = "ATTEMPTED_PAGES")
     var downloaded = 0
 
-    @Ignore
+    @ColumnInfo(name = "TOTAL_PAGES")
     var total = 0
 
     constructor(galleryInfo: GalleryInfo) : this() {

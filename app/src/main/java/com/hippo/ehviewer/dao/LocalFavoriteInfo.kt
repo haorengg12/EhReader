@@ -19,12 +19,10 @@ package com.hippo.ehviewer.dao
 
 import android.annotation.SuppressLint
 import androidx.room.ColumnInfo
-import androidx.room.Entity
 import com.hippo.ehviewer.client.data.BaseGalleryInfo
 import com.hippo.ehviewer.client.data.GalleryInfo
 
 @SuppressLint("ParcelCreator")
-@Entity(tableName = "LOCAL_FAVORITES")
 class LocalFavoriteInfo() : BaseGalleryInfo() {
     @ColumnInfo(name = "TIME")
     var time: Long = 0

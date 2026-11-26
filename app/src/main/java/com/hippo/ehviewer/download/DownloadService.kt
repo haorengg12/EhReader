@@ -19,6 +19,7 @@ import android.Manifest
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
@@ -31,7 +32,9 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
+import androidx.preference.PreferenceManager
 import com.hippo.ehviewer.R
+import com.hippo.ehviewer.Settings
 import com.hippo.ehviewer.client.EhUtils
 import com.hippo.ehviewer.client.data.GalleryInfo
 import com.hippo.ehviewer.dao.DownloadInfo
@@ -46,7 +49,8 @@ import com.hippo.yorozuya.collect.LongList
 
 class DownloadService :
     Service(),
-    DownloadManager.DownloadListener {
+    DownloadManager.DownloadListener,
+    SharedPreferences.OnSharedPreferenceChangeListener {
     private var mNotifyManager: NotificationManagerCompat? = null
     private var mDownloadManager: DownloadManager? = null
     private var mDownloadingBuilder: NotificationCompat.Builder? = null
@@ -71,6 +75,7 @@ class DownloadService :
         )
         mDownloadManager = DownloadManager
         mDownloadManager!!.setDownloadListener(this)
+        PreferenceManager.getDefaultSharedPreferences(this).registerOnSharedPreferenceChangeListener(this)
         ensureDownloadingBuilder()
         mDownloadingBuilder!!.setContentTitle(getString(R.string.download_service))
             .setContentText(null)
@@ -80,6 +85,8 @@ class DownloadService :
     }
 
     override fun onDestroy() {
+        PreferenceManager.getDefaultSharedPreferences(this).unregisterOnSharedPreferenceChangeListener(this)
+        mDownloadingDelay?.discardPending()
         super.onDestroy()
         mNotifyManager = null
         if (mDownloadManager != null) {
@@ -89,6 +96,10 @@ class DownloadService :
         mDownloadingBuilder = null
         mDownloadedBuilder = null
         m509dBuilder = null
+    }
+
+    override fun onSharedPreferenceChanged(preferences: SharedPreferences?, key: String?) {
+        if (key == Settings.KEY_CONCURRENT_GALLERIES || key == null) mDownloadManager?.ensureDownload()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -236,12 +247,17 @@ class DownloadService :
     }
 
     override fun onStart(info: DownloadInfo) {
-        if (mNotifyManager == null) {
-            return
-        }
+        refreshRunningNotification()
+    }
+
+    /** 多部运行时打开队列，回落到一部时恢复该画廊的页数、速度和跳转目标。 */
+    private fun refreshRunningNotification() {
+        val manager = mDownloadManager ?: return
+        val info = manager.firstRunning ?: return
+        val count = manager.runningCount
         ensureDownloadingBuilder()
         val bundle = Bundle()
-        bundle.putLong(DownloadsScene.KEY_GID, info.gid)
+        if (count == 1) bundle.putLong(DownloadsScene.KEY_GID, info.gid)
         val activityIntent = Intent(this, MainActivity::class.java)
         activityIntent.action = StageActivity.ACTION_START_SCENE
         activityIntent.putExtra(StageActivity.KEY_SCENE_NAME, DownloadsScene::class.java.name)
@@ -252,16 +268,21 @@ class DownloadService :
             activityIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        mDownloadingBuilder!!.setContentTitle(EhUtils.getSuitableTitle(info))
-            .setContentText(null)
-            .setSubText(null)
-            .setProgress(0, 0, true)
-            .setContentIntent(piActivity)
-        mDownloadingDelay!!.startForeground()
+        mDownloadingBuilder!!.setContentIntent(piActivity)
+        if (count == 1) {
+            onUpdate(info)
+        } else {
+            mDownloadingBuilder!!.setContentTitle(resources.getQuantityString(R.plurals.active_download_galleries, count, count))
+                .setContentText(null)
+                .setStyle(null)
+                .setSubText(null)
+                .setProgress(0, 0, true)
+            mDownloadingDelay!!.startForeground()
+        }
     }
 
     private fun onUpdate(info: DownloadInfo) {
-        if (mNotifyManager == null) {
+        if (mNotifyManager == null || mDownloadManager?.runningCount != 1) {
             return
         }
         ensureDownloadingBuilder()
@@ -284,7 +305,7 @@ class DownloadService :
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setSubText(if (info.total == -1 || info.finished == -1) null else info.finished.toString() + "/" + info.total)
-            .setProgress(info.total, info.finished, false)
+            .setProgress(info.total.coerceAtLeast(0), info.finished, info.total <= 0)
         mDownloadingDelay!!.startForeground()
     }
 
@@ -300,9 +321,7 @@ class DownloadService :
         if (mNotifyManager == null) {
             return
         }
-        if (null != mDownloadingDelay) {
-            mDownloadingDelay!!.cancel()
-        }
+        refreshRunningNotification()
         ensureDownloadedBuilder()
         val finish = info.state == DownloadInfo.STATE_FINISH
         val gid = info.gid
@@ -404,14 +423,13 @@ class DownloadService :
         if (mNotifyManager == null) {
             return
         }
-        if (null != mDownloadingDelay) {
-            mDownloadingDelay!!.cancel()
-        }
+        refreshRunningNotification()
         checkStopSelf()
     }
 
     private fun checkStopSelf() {
         if (mDownloadManager == null || mDownloadManager!!.isIdle) {
+            mDownloadingDelay?.discardPending()
             ServiceCompat.stopForeground(this@DownloadService, ServiceCompat.STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -455,21 +473,9 @@ class DownloadService :
             }
         }
 
-        fun cancel() {
-            if (mPosted) {
-                mOps = OPS_CANCEL
-            } else {
-                val now = SystemClock.currentThreadTimeMillis()
-                if (now - mLastTime > DELAY) {
-                    // Wait long enough, do it now
-                    mNotifyManager.cancel(mId)
-                } else {
-                    // Too quick, post delay
-                    mOps = OPS_CANCEL
-                    mPosted = true
-                    SimpleHandler.getInstance().postDelayed(this, DELAY)
-                }
-            }
+        fun discardPending() {
+            SimpleHandler.getInstance().removeCallbacks(this)
+            mPosted = false
         }
 
         fun startForeground() {
@@ -502,17 +508,15 @@ class DownloadService :
                     }
                     mNotifyManager.notify(mId, mBuilder.build())
                 }
-                OPS_CANCEL -> mNotifyManager.cancel(mId)
                 OPS_START_FOREGROUND -> mService.startForeground(mId, mBuilder.build())
             }
         }
 
-        @IntDef(OPS_NOTIFY, OPS_CANCEL, OPS_START_FOREGROUND)
+        @IntDef(OPS_NOTIFY, OPS_START_FOREGROUND)
         @Retention(AnnotationRetention.SOURCE)
         private annotation class Ops
         companion object {
             private const val OPS_NOTIFY = 0
-            private const val OPS_CANCEL = 1
             private const val OPS_START_FOREGROUND = 2
             private const val DELAY: Long = 1000 // 1s
         }

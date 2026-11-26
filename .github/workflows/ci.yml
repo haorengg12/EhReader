@@ -1,67 +1,100 @@
-name: CI
+name: EhReader CI
 
 on:
   push:
-    branches:
-      - '*'
+    branches: [develop]
   pull_request:
+    branches: [develop, master]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
+    inputs:
+      repair_debug:
+        description: Revalidate a failed major/minor build at this develop SHA
+        type: boolean
+        default: false
+      base_sha:
+        description: Fixed original pre-version-change SHA (required for Debug repair)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
 
 jobs:
-  linux:
-    name: Build
+  quality:
+    name: Basic quality
+    if: github.repository == 'haorengg12/EhReader' && github.event.deleted != true
     runs-on: ubuntu-latest
+    outputs:
+      debug: ${{ steps.route.outputs.debug }}
+      path: ${{ steps.route.outputs.path }}
+      version: ${{ steps.route.outputs.version }}
+      sha: ${{ steps.route.outputs.sha }}
+      base: ${{ steps.route.outputs.base }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check standards and release gates
+        run: |
+          python3 scripts/check_standards_encoding.py
+          node scripts/check-docs.mjs
+          node --test scripts/*.test.mjs
+      - name: Select version path from fixed event SHAs
+        id: route
+        run: node scripts/ci.mjs plan
 
-      - name: Setup Java
-        uses: actions/setup-java@v5
+  debug:
+    name: Development Debug
+    needs: quality
+    if: >-
+      needs.quality.outputs.debug == 'true' &&
+      github.repository == 'haorengg12/EhReader' &&
+      github.ref == 'refs/heads/develop' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ehreader-dev-${{ needs.quality.outputs.version }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.quality.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
-
-      - name: Spotless Check
-        run: ./gradlew spotlessCheck
-
-      - name: Gradle Build
-        run: ./gradlew assembleRelease
-
-      - name: Upload Universal
-        uses: actions/upload-artifact@v7
+      - uses: android-actions/setup-android@v3
         with:
-          name: universal-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-universal-release.apk
-
-      - name: Upload ARM64
-        uses: actions/upload-artifact@v7
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;29.0.14206865 cmake;3.22.1
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Check and build debug
+        run: ./gradlew spotlessCheck assembleDebug lintDebug testDebugUnitTest
+      - name: Verify debug APK architectures
+        run: |
+          python3 scripts/check_debug_apks.py
+          node scripts/native-sources.mjs
+      - uses: actions/upload-artifact@v7
         with:
-          name: arm64-v8a-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-arm64-v8a-release.apk
-
-      - name: Upload ARM32
-        uses: actions/upload-artifact@v7
+          name: EhReader-debug-${{ needs.quality.outputs.sha }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
-          name: armeabi-v7a-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-armeabi-v7a-release.apk
-
-      - name: Upload x86_64
-        uses: actions/upload-artifact@v7
-        with:
-          name: x86_64-${{ github.sha }}
-          path: app/build/outputs/apk/release/app-x86_64-release.apk
-
-      - name: Upload mapping
-        uses: actions/upload-artifact@v7
-        with:
-          name: mapping-${{ github.sha }}
-          path: app/build/outputs/mapping/release/mapping.txt
-
-      - name: Upload native debug symbols
-        uses: actions/upload-artifact@v7
-        with:
-          name: native-debug-symbols-${{ github.sha }}
-          path: app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip
+          name: EhReader-checks-${{ needs.quality.outputs.sha }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: warn

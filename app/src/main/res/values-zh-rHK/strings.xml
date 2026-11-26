@@ -57,7 +57,7 @@
     <string name="clipboard_gallery_url_snack_action">查看</string>
     <string name="please_wait">請稍候…</string>
     <string name="app_link_not_verified_title">應用鏈接未驗證</string>
-    <string name="app_link_not_verified_message">對於 Android 12 及更高版本，您需要手動添加鏈接到已驗證鏈接才能在 EhViewer 中打開 E-Hentai 鏈接。</string>
+    <string name="app_link_not_verified_message">對於 Android 12 及更高版本，您需要手動添加鏈接到已驗證鏈接才能在 EhReader 中打開 E-Hentai 鏈接。</string>
     <string name="open_settings">打開設置</string>
     <string name="dont_show_again">不再顯示</string>
 
@@ -368,7 +368,7 @@
     <string name="default_download_label">默認下載標籤</string>
     <!-- Download Service -->
     <string name="download_service">下載服務</string>
-    <string name="download_service_label">EhViewer 下載服務</string>
+    <string name="download_service_label">EhReader 下載服務</string>
     <string name="download_speed_text_2">%1$s，剩餘 %2$s</string>
     <string name="stat_download_action_stop_all">全部停止</string>
     <string name="stat_509_alert_title">509 警告</string>
@@ -482,7 +482,11 @@
     <string name="settings_download_media_scan_summary_on">請避免他人翻看您的圖庫應用</string>
     <string name="settings_download_media_scan_summary_off">大多數圖庫應用將不會顯示下載目錄中的圖片</string>
     <string name="settings_download_concurrency">並發下載數</string>
-    <string name="settings_download_concurrency_summary">最多同時下載 %s 張圖片</string>
+    <string name="settings_download_concurrency_summary">每部畫廊最多同時下載 %s 張圖片</string>
+    <string name="settings_download_gallery_concurrency">同時下載畫廊數量</string>
+    <plurals name="active_download_galleries">
+        <item quantity="other">正在下載 %1$d 部畫廊</item>
+    </plurals>
     <string name="settings_download_download_delay">下載延時</string>
     <string name="settings_download_download_delay_summary">每次下載延時 %s 毫秒</string>
     <string name="settings_download_download_timeout">下載超時（秒）</string>
@@ -495,12 +499,12 @@
     <string name="settings_download_download_origin_image_only">僅下載時啓用</string>
     <string name="settings_download_task_confirm">確定要執行操作？</string>
     <string name="settings_download_restore_download_items">恢復下載項</string>
-    <string name="settings_download_restore_download_items_summary">恢復下載目錄裏的所有下載項</string>
+    <string name="settings_download_restore_download_items_summary">掃描目前下載目錄，恢復可識別畫廊並補齊恢復資訊。</string>
     <string name="settings_download_restore_not_found">未找到可恢復下載項</string>
     <string name="settings_download_restore_failed">恢復失敗</string>
     <string name="settings_download_restore_successfully">成功恢復 %d 項</string>
     <string name="settings_download_clean_redundancy">清理下載冗餘</string>
-    <string name="settings_download_clean_redundancy_summary">清理下載目錄中不在下載列表裏的圖片文件</string>
+    <string name="settings_download_clean_redundancy_summary">清理目前下載目錄中不在下載清單內的可識別畫廊資料夾。</string>
     <string name="settings_download_clean_redundancy_no_redundancy">未發現冗餘</string>
     <string name="settings_download_clean_redundancy_done">完成冗餘清理，共清理 %d 項</string>
     <string name="settings_privacy">隱私</string>
@@ -534,15 +538,15 @@
     <string name="settings_advanced_export_data_summary">保存數據至外置存儲器，例如下載列表，快速搜索列表</string>
     <string name="settings_advanced_export_data_to">已導出數據至 %s</string>
     <string name="settings_advanced_export_data_failed">導出數據失敗</string>
-    <string name="settings_advanced_import_data">導入數據</string>
+    <string name="settings_advanced_import_data">匯入資料</string>
     <string name="settings_advanced_import_data_summary">從外置存儲器導入數據</string>
     <string name="settings_advanced_import_data_successfully">導入數據成功</string>
     <string name="settings_advanced_import_data_cant_read">無法讀取文件</string>
     <string name="settings_advanced_open_by_default">默認打開</string>
     <string name="settings_about">關於</string>
-    <string name="settings_about_declaration_summary">EhViewer 與 E-Hentai.org 無任何聯繫</string>
+    <string name="settings_about_declaration_summary">EhReader 與 E-Hentai.org 無任何聯繫</string>
     <string name="settings_about_author">作者</string>
-    <string name="settings_about_issues">常見問題</string>
+    <string name="settings_about_issues">問題回報</string>
     <string name="settings_about_latest_release">最新版本</string>
     <string name="settings_about_source">源碼</string>
     <string name="settings_about_version">版本號</string>
@@ -636,4 +640,16 @@
     <plurals name="year">
         <item quantity="other">年</item>
     </plurals>
+    <string name="gallery_detail_local_error">正在顯示本機儲存的畫廊資訊。%1$s</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
+    <string name="settings_compatibility">兼容性</string>
+    <string name="settings_compatibility_import_legacy">匯入舊版本EhViewer資料</string>
+    <string name="settings_compatibility_import_legacy_summary">匯入舊版本 EhViewer 的資料，暫未開放。</string>
+    <string name="settings_compatibility_restore_downloads">還原下載項目（舊版本）</string>
+    <string name="settings_compatibility_restore_downloads_summary">遷移舊版本下載目錄中的本機檔案，暫未開放。</string>
+    <string name="settings_compatibility_unavailable">此功能暫未開放</string>
+    <string name="settings_download_restore_report">恢復 %1$d 項，跳過 %2$d 項，失敗 %3$d 項。</string>
+    <string name="settings_download_clean_redundancy_report">清理 %1$d 項，跳過 %2$d 項，失敗 %3$d 項。</string>
+    <string name="settings_download_maintenance_stopped">請暫停下載並等待其他檔案操作完成後重試。</string>
+    <string name="settings_download_clean_redundancy_failed">下載目錄無法使用或清理失敗。</string>
 </resources>

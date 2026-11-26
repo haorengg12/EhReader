@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_delete_report">Deleted: %1$d; skipped: %2$d; failed: %3$d</string>
+    <string name="download_delete_skipped">Busy or already removed. Close the reader and retry.</string>
+    <string name="download_delete_database_failed">Files deleted, but database update failed. Records retained; retry deletion.</string>
+    <string name="download_delete_partial">File cleanup was incomplete. Records retained; retry deletion.</string>
+    <string name="download_delete_failed">Deletion failed. Records retained; check storage access and retry.</string>
+</resources>

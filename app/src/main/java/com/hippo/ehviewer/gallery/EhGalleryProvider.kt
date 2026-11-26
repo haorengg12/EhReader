@@ -30,19 +30,24 @@ class EhGalleryProvider(private val mGalleryInfo: GalleryInfo) :
     OnSpiderListener {
     private lateinit var mSpiderQueen: SpiderQueen
     override fun start() {
-        mSpiderQueen = obtainSpiderQueen(mGalleryInfo, SpiderQueen.MODE_READ)
-        mSpiderQueen.addOnSpiderListener(this)
+        try {
+            mSpiderQueen = obtainSpiderQueen(mGalleryInfo, SpiderQueen.MODE_READ)
+            mSpiderQueen.addOnSpiderListener(this)
+        } catch (error: Exception) {
+            android.util.Log.e("EhGalleryProvider", "Gallery unavailable", error)
+        }
     }
 
     override fun stop() {
         super.stop()
+        if (!this::mSpiderQueen.isInitialized) return
         mSpiderQueen.removeOnSpiderListener(this)
         // Activity recreate may called, so wait 3000s
         SimpleHandler.getInstance().postDelayed(ReleaseTask(mSpiderQueen), 3000)
     }
 
     override val startPage
-        get() = mSpiderQueen.startPage
+        get() = if (this::mSpiderQueen.isInitialized) mSpiderQueen.startPage else 0
 
     override fun getImageFilename(index: Int): String = String.format(
         Locale.US,
@@ -80,11 +85,11 @@ class EhGalleryProvider(private val mGalleryInfo: GalleryInfo) :
     override suspend fun downloadOriginal(index: Int, dir: UniFile, filename: String): UniFile? = mSpiderQueen.downloadOriginal(index, dir, filename)
 
     override fun putStartPage(page: Int) {
-        mSpiderQueen.putStartPage(page)
+        if (this::mSpiderQueen.isInitialized) mSpiderQueen.putStartPage(page)
     }
 
     override val size: Int
-        get() = mSpiderQueen.size
+        get() = if (isReady) mSpiderQueen.size else 0
 
     override fun onRequest(index: Int) {
         notifyPageWait(index)
@@ -96,10 +101,10 @@ class EhGalleryProvider(private val mGalleryInfo: GalleryInfo) :
         mSpiderQueen.forceRequest(index)
     }
 
-    override suspend fun awaitReady(): Boolean = mSpiderQueen.awaitReady()
+    override suspend fun awaitReady(): Boolean = this::mSpiderQueen.isInitialized && mSpiderQueen.awaitReady()
 
     override val isReady: Boolean
-        get() = mSpiderQueen.isReady
+        get() = this::mSpiderQueen.isInitialized && mSpiderQueen.isReady
 
     override fun onCancelRequest(index: Int) {
         mSpiderQueen.cancelRequest(index)

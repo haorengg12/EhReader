@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="offline_filter">Offline filter</string>
+    <string name="offline_filter_scope">Group: %1$s. Filters are combined. Select all and reverse start apply to all matching downloads. Start all and Pause all apply to the entire download list.</string>
+    <string name="offline_filter_category">Category</string>
+    <string name="offline_filter_language">Language</string>
+    <string name="offline_filter_unknown">Not recorded</string>
+    <string name="offline_filter_min_rating">Minimum rating (0–5, optional)</string>
+    <string name="offline_filter_max_rating">Maximum rating (0–5, optional)</string>
+    <string name="offline_filter_remove_tag">Remove: %1$s</string>
+    <string name="offline_filter_tag_mode">Add tags to</string>
+    <string name="offline_filter_tag_hint">Full namespace:original tag (e.g. artist:name)</string>
+    <string name="offline_filter_add_tag">Add tag</string>
+    <string name="offline_filter_tags">Global tags and counts</string>
+    <string name="offline_filter_rebuild">Rebuild tag index</string>
+    <string name="offline_filter_loading">Loading…</string>
+    <string name="offline_filter_rebuilt">Tag index rebuilt</string>
+    <string name="offline_filter_failed">Query or rebuild failed. Tap filter to retry.</string>
+    <string name="offline_filter_clear">Clear filters</string>
+    <string name="offline_filter_rating_error">Enter ratings from 0 to 5, with minimum no higher than maximum.</string>
+    <string name="offline_filter_global_counts">Counts cover all download records, including paused, failed and unfinished downloads. They do not change with filters. Search by original namespace or tag.</string>
+    <string name="offline_filter_tag_search">Search original namespace or tag</string>
+    <string name="offline_filter_previous">Previous</string>
+    <string name="offline_filter_next">Next</string>
+    <string name="offline_filter_tag_page">Global tags · Page %1$d</string>
+    <plurals name="offline_filter_tag_count">
+        <item quantity="one">%1$s · %2$d gallery</item>
+        <item quantity="other">%1$s · %2$d galleries</item>
+    </plurals>
+    <string name="offline_filter_empty_tags">No matching tags. Missing local tags can be filled by fetching gallery details separately.</string>
+    <string name="offline_filter_rating_desc">Rating: high to low</string>
+    <string name="offline_filter_rating_asc">Rating: low to high</string>
+    <string name="offline_filter_gid_desc">GID: descending</string>
+    <string-array name="download_tag_modes">
+        <item>All of these tags (AND)</item>
+        <item>Any of these tags (OR)</item>
+        <item>None of these tags (NOT)</item>
+    </string-array>
+    <string-array name="download_offline_sort">
+        <item>@string/download_sort_added_time_desc</item>
+        <item>@string/download_sort_added_time_asc</item>
+        <item>@string/download_sort_title_asc</item>
+        <item>@string/download_sort_title_desc</item>
+        <item>@string/offline_filter_rating_desc</item>
+        <item>@string/offline_filter_rating_asc</item>
+        <item>@string/download_sort_category_asc</item>
+        <item>@string/offline_filter_gid_desc</item>
+    </string-array>
+    <string name="offline_filter_empty_results">No downloads match these filters.</string>
+</resources>

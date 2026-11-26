@@ -18,6 +18,7 @@ package com.hippo.ehviewer.spider
 import android.util.Log
 import coil3.disk.DiskCache
 import com.hippo.ehviewer.EhApplication
+import com.hippo.ehviewer.EhDB
 import com.hippo.ehviewer.coil.edit
 import com.hippo.unifile.UniFile
 import com.hippo.unifile.openInputStream
@@ -25,6 +26,7 @@ import com.hippo.unifile.openOutputStream
 import com.hippo.util.runSuspendCatching
 import com.hippo.yorozuya.NumberUtils
 import java.io.InputStream
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.Cbor
 import kotlinx.serialization.decodeFromByteArray
@@ -37,29 +39,42 @@ class SpiderInfo(
     val gid: Long,
     var token: String? = null,
     val pages: Int,
-    val pTokenMap: MutableMap<Int, String> = hashMapOf(),
+    var pTokenMap: MutableMap<Int, String> = ConcurrentHashMap(),
     var startPage: Int = 0,
     var previewPages: Int = -1,
     var previewPerPage: Int = -1,
     var upgradeFrom: Long? = null,
+    var downloadFormat: String? = null,
 )
 
 private val cbor = Cbor { ignoreUnknownKeys = true }
 
-private val spiderInfoCache by lazy {
-    DiskCache.Builder()
-        .directory(EhApplication.cacheDir / "spider_info_v2")
-        .maxSizeBytes(20 * 1024 * 1024)
-        .build()
-}
-
 fun readFromUniFile(file: UniFile): SpiderInfo? = runCatching {
-    file.openInputStream().use { cbor.decodeFromByteArray<SpiderInfo>(it.readBytes()) }
-}.getOrNull() ?: runCatching {
-    file.openInputStream().use { readLegacySpiderInfo(it) }
+    file.openInputStream().use { input ->
+        val output = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            check(output.size() + count <= 16 * 1024 * 1024) { "Oversized spider info" }
+            output.write(buffer, 0, count)
+        }
+        decodeSpiderInfo(output.toByteArray())
+    }
 }.onFailure {
     Log.e(TAG, "Error", it)
 }.getOrNull()
+
+/** 主库及 .ehreader 共用的续传格式；保留旧编码读取能力，拒绝损坏身份和越界页号。 */
+fun decodeSpiderInfo(bytes: ByteArray): SpiderInfo? {
+    if (bytes.size > 16 * 1024 * 1024) return null
+    val info = runCatching { cbor.decodeFromByteArray<SpiderInfo>(bytes) }.getOrNull()
+        ?: runCatching { bytes.inputStream().use(::readLegacySpiderInfo) }.getOrNull()
+    return info?.takeIf { it.gid > 0 && it.pages > 0 && it.startPage in 0 until it.pages && it.pTokenMap.keys.all { index -> index in 0 until it.pages } }
+        ?.apply { pTokenMap = ConcurrentHashMap(pTokenMap) }
+}
+
+fun SpiderInfo.encodeSpiderInfo(): ByteArray = cbor.encodeToByteArray(this)
 
 fun SpiderInfo.saveToUniFile(file: UniFile) = runSuspendCatching {
     file.openOutputStream().use { it.write(cbor.encodeToByteArray(this@saveToUniFile)) }
@@ -68,19 +83,18 @@ fun SpiderInfo.saveToUniFile(file: UniFile) = runSuspendCatching {
 }
 
 fun readFromCache(gid: Long): SpiderInfo? = runCatching {
-    spiderInfoCache.openSnapshot(gid.toString())?.use {
-        cbor.decodeFromByteArray<SpiderInfo>(it.data.toFile().readBytes())
+    EhDB.getReadingState(gid)?.let { state ->
+        state.spiderInfo?.let {
+            cbor.decodeFromByteArray<SpiderInfo>(it).apply {
+                startPage = state.page
+                pTokenMap = ConcurrentHashMap(pTokenMap)
+            }
+        }
     }
-}.onFailure {
-    Log.e(TAG, "Error", it)
-}.getOrNull()
+}.onFailure { Log.e(TAG, "Cannot read persisted spider info", it) }.getOrNull()
 
-fun SpiderInfo.saveToCache() = runSuspendCatching {
-    spiderInfoCache.edit(gid.toString()) {
-        data.toFile().writeBytes(cbor.encodeToByteArray(this@saveToCache))
-    }
-}.onFailure {
-    Log.e(TAG, "Error", it)
+fun SpiderInfo.saveToCache() {
+    EhDB.putReadingState(gid, spiderInfo = cbor.encodeToByteArray(this))
 }
 
 private fun readLegacySpiderInfo(inputStream: InputStream): SpiderInfo? {

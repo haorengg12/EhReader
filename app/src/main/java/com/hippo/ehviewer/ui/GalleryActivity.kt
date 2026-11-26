@@ -221,7 +221,7 @@ class GalleryActivity :
             } else {
                 return null
             }
-            return EhUrl.getGalleryDetailUrl(gid, token, 0, false)
+            return com.hippo.ehviewer.EhDB.getGalleryMetadata(gid)?.detailUrl ?: EhUrl.getGalleryDetailUrl(gid, token, 0, false)
         }
 
     private fun buildProvider(replace: Boolean = false) {

@@ -59,6 +59,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import okhttp3.FormBody
 import okhttp3.Headers
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -260,7 +261,9 @@ object EhEngine {
             EventPaneParser.parse(this)?.let {
                 application.showEventPane(it)
             }
-            GalleryDetailParser.parse(this)
+            GalleryDetailParser.parse(this).also { detail ->
+                com.hippo.ehviewer.EhDB.putGalleryMetadata(detail, url, EhCookieStore.getCookieValue(EhUrl.HOST_E.toHttpUrl(), EhCookieStore.KEY_IPB_MEMBER_ID))
+            }
         }
     }
 

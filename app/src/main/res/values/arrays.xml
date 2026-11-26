@@ -57,6 +57,19 @@
         <item>@string/star_5</item>
     </string-array>
 
+    <string-array name="concurrent_gallery_counts" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+    </string-array>
+
     <string-array name="multi_thread_download_entries" translatable="false">
         <item>1</item>
         <item>3</item>

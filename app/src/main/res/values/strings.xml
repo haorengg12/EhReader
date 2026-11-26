@@ -16,7 +16,7 @@
 
 <resources>
     <!-- App Name -->
-    <string name="app_name" translatable="false">EhViewer</string>
+    <string name="app_name" translatable="false">EhReader</string>
 
     <!-- Login Scene -->
     <string name="app_waring">The content of this application is from the Internet. Some of it may do physical or mental harm to you. You have learnt the risks above and would like to undertake them.\nBy continuing to use it, you agree to the above terms.</string>
@@ -62,7 +62,7 @@
     <string name="clipboard_gallery_url_snack_action">View</string>
     <string name="please_wait">Please wait…</string>
     <string name="app_link_not_verified_title">App links not verified</string>
-    <string name="app_link_not_verified_message">For Android 12 and newer, you need to manually add link to verified links in order to open E-Hentai links in EhViewer.</string>
+    <string name="app_link_not_verified_message">For Android 12 and newer, you need to manually add link to verified links in order to open E-Hentai links in EhReader.</string>
     <string name="open_settings">Open settings</string>
     <string name="dont_show_again">Don\'t show again</string>
 
@@ -393,7 +393,7 @@
     <string name="default_download_label">Default download label</string>
     <!-- Download Service -->
     <string name="download_service">Download Service</string>
-    <string name="download_service_label">EhViewer Download Service</string>
+    <string name="download_service_label">EhReader Download Service</string>
     <string name="download_speed_text" translatable="false">%s</string>
     <string name="download_speed_text_2">%1$s, %2$s left</string>
     <string name="stat_download_action_stop_all">Stop all</string>
@@ -508,7 +508,12 @@
     <string name="settings_download_media_scan_summary_on">Please hide your gallery apps away from other people</string>
     <string name="settings_download_media_scan_summary_off">Most gallery apps will ignore pictures in the download path</string>
     <string name="settings_download_concurrency">Concurrency download</string>
-    <string name="settings_download_concurrency_summary">Up to %s images</string>
+    <string name="settings_download_concurrency_summary">Up to %s images at a time per gallery</string>
+    <string name="settings_download_gallery_concurrency">Concurrent galleries</string>
+    <plurals name="active_download_galleries">
+        <item quantity="one">Downloading %1$d gallery</item>
+        <item quantity="other">Downloading %1$d galleries</item>
+    </plurals>
     <string name="settings_download_download_delay">Download delay</string>
     <string name="settings_download_download_delay_summary">Delay %s ms per download</string>
     <string name="settings_download_download_timeout">Download timeout (in seconds)</string>
@@ -520,13 +525,13 @@
     <string name="settings_download_download_origin_image_force">Always</string>
     <string name="settings_download_download_origin_image_only">Download only</string>
     <string name="settings_download_task_confirm">Are you sure you want to perform this action?</string>
-    <string name="settings_download_restore_download_items">Restore download items</string>
-    <string name="settings_download_restore_download_items_summary">Restore all download items in download location</string>
+    <string name="settings_download_restore_download_items">Restore downloads</string>
+    <string name="settings_download_restore_download_items_summary">Scan the selected download folder to restore recognized galleries and their recovery information.</string>
     <string name="settings_download_restore_not_found">Not found download items to restore</string>
     <string name="settings_download_restore_failed">Restore failed</string>
     <string name="settings_download_restore_successfully">Restore %d items successfully</string>
     <string name="settings_download_clean_redundancy">Clear download redundancy</string>
-    <string name="settings_download_clean_redundancy_summary">Remove gallery images which are not in download list but in download location</string>
+    <string name="settings_download_clean_redundancy_summary">Remove recognized gallery folders in the selected download folder that are absent from the download list.</string>
     <string name="settings_download_clean_redundancy_no_redundancy">No redundancy</string>
     <string name="settings_download_clean_redundancy_done">Redundancy cleaning completed, clean-up %d items totally</string>
     <string name="settings_privacy">Privacy</string>
@@ -560,20 +565,20 @@
     <string name="settings_advanced_backup_favorite_success">Backup favorite list success</string>
     <string name="settings_advanced_backup_favorite_failed">Backup favorite list failed</string>
     <string name="settings_advanced_export_data">Export data</string>
-    <string name="settings_advanced_export_data_summary">Save data like download list, quick search list, to external storage</string>
+    <string name="settings_advanced_export_data_summary">Back up metadata, downloads, history, favorites, bookmarks, rules, locations and reading progress. Images, settings and directory permissions are not included.</string>
     <string name="settings_advanced_export_data_to">Exported data to %s</string>
     <string name="settings_advanced_export_data_failed">Failed to export data</string>
     <string name="settings_advanced_import_data">Import data</string>
-    <string name="settings_advanced_import_data_summary">Load data which were previously saved</string>
+    <string name="settings_advanced_import_data_summary">Merge a new-format database backup including metadata and reading progress. Pause downloads first, then select a download root and reconnect files. Old EhViewer backups require the separate legacy importer.</string>
     <string name="settings_advanced_import_data_successfully">Data imported</string>
-    <string name="settings_advanced_import_data_cant_read">Can\'t read the file</string>
+    <string name="settings_advanced_import_data_cant_read">Cannot restore this backup. Pause downloads and select a new-format EhReader database. Old EhViewer databases are not supported here.</string>
     <string name="settings_advanced_open_by_default">Open by default</string>
     <string name="settings_about">About</string>
-    <string name="settings_about_declaration" translatable="false">EhViewer</string>
-    <string name="settings_about_declaration_summary">EhViewer is not affiliated with E-Hentai.org in any way</string>
+    <string name="settings_about_declaration" translatable="false">EhReader</string>
+    <string name="settings_about_declaration_summary">EhReader is not affiliated with E-Hentai.org in any way</string>
     <string name="settings_about_author">Author</string>
-    <string name="settings_about_author_summary" translatable="false">&lt;del&gt;Hippo &amp;lt;ehviewersu$gmail.com&amp;gt;&lt;/del&gt;&lt;br&gt;&lt;del&gt;NekoInverter&lt;/del&gt;&lt;br&gt;小白-白</string>
-    <string name="settings_about_issues">FAQ</string>
+    <string name="settings_about_author_summary" translatable="false">&lt;del&gt;Hippo &amp;lt;ehviewersu$gmail.com&amp;gt;&lt;/del&gt;&lt;br&gt;&lt;del&gt;NekoInverter&lt;/del&gt;&lt;br&gt;&lt;del&gt;小白白&lt;/del&gt;&lt;br&gt;haorengg12</string>
+    <string name="settings_about_issues">Issue tracker</string>
     <string name="settings_about_latest_release">Latest release</string>
     <string name="settings_about_source">Source</string>
     <string name="settings_about_version">Build version</string>
@@ -704,4 +709,18 @@
         <item quantity="one">year</item>
         <item quantity="other">years</item>
     </plurals>
+    <string name="settings_download_save_as_cbz">Save as CBZ archive</string>
+    <string name="settings_download_save_as_cbz_summary">Applies to new downloads. Turn off to save numbered images.</string>
+    <string name="gallery_detail_local_error">Showing saved gallery information. %1$s</string>
+    <string name="gallery_detail_rating_without_count">%1$.2f / 5</string>
+    <string name="settings_compatibility">Compatibility</string>
+    <string name="settings_compatibility_import_legacy">Import legacy EhViewer data</string>
+    <string name="settings_compatibility_import_legacy_summary">Import data from an older EhViewer version. Not available yet.</string>
+    <string name="settings_compatibility_restore_downloads">Restore downloads (legacy)</string>
+    <string name="settings_compatibility_restore_downloads_summary">Migrate local downloads from an older version. Not available yet.</string>
+    <string name="settings_compatibility_unavailable">This feature is not available yet.</string>
+    <string name="settings_download_restore_report">Restored %1$d; skipped %2$d; failed %3$d.</string>
+    <string name="settings_download_clean_redundancy_report">Removed %1$d; skipped %2$d; failed %3$d.</string>
+    <string name="settings_download_maintenance_stopped">Pause downloads and wait for other file operations, then retry.</string>
+    <string name="settings_download_clean_redundancy_failed">Download folder unavailable or cleanup failed.</string>
 </resources>
